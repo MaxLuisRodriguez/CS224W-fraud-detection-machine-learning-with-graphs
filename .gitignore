@@ -1,0 +1,25 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+dist/
+*.egg-info/
+
+# Data, caches, and experiment outputs (all re-creatable; synced to S3, not Git)
+data/
+artifacts/
+outputs/
+runs/
+checkpoints/
+*.pt
+*.ckpt
+*.sqlite*
+*.log
+
+# Secrets and machine-local config
+.env
+*.pem
+*.local.json
