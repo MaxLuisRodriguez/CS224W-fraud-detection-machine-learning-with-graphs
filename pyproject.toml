@@ -1,0 +1,15 @@
+# Package metadata: the importable name is "wtl" (Worth The Lookup).
+[project]
+name = "wtl"
+version = "0.1.0"
+description = "Worth the Lookup: budgeted relational retrieval for call-list prioritization"
+requires-python = ">=3.10"
+
+# How to build the package: the standard setuptools backend.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Look for packages inside src/ (the "src layout": tests import the installed package, not stray local files).
+[tool.setuptools.packages.find]
+where = ["src"]
