@@ -13,7 +13,7 @@ A sales rep's call list is a graph. Prospects share accounts, events, colleagues
 ## Documents
 
 - [Project plan](docs/PROJECT_PLAN.md): audit of the previous plan, problem, method, experiments, rubric map, AWS budget, schedule to the Oct 20 / Nov 10 / Dec 10 deadlines.
-- [Build modules](docs/modules/README.md): step-by-step build with PASS/STOP checks, starting with [Module 1: orientation and setup](docs/modules/01-orientation-and-setup.md).
+- [Build modules](docs/modules/README.md): step-by-step build with PASS/STOP checks, starting with [P0: setup](docs/modules/P0-setup.md).
 - [Related work](docs/RELATED_WORK.md): closest prior work and what remains open.
 - [Archive](docs/archive/2026-09-aml-fraud/ARCHIVE-NOTE.md): the superseded September AML/fraud plans.
 

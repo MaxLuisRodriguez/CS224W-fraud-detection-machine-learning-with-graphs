@@ -61,7 +61,9 @@ driver-top3: predict qualifying for drivers.driverId, 30 days 00:00:00 ahead
 
 Don't run `peek_data.py` on `rel-event` or `rel-avito` on the laptop: `get_db()` loads every table into memory (30M+ rows), which is too much for 16 GB. P3 reads those two without loading them.
 
-## 2.3 Do: start `proposal/refs.bib`
+## 2.3 Do: read the data citation in `proposal/refs.bib`
+
+`proposal/refs.bib` already exists, with 13 verified entries for the draft. Don't recreate it. Open it, find the RelBench entry below (the citation the Hugging Face README asks for), and note its anatomy: entry type (`@inproceedings`), citation key (`robinson2024relbench`, the name you use in `\cite{...}`), then the fields.
 
 ```bibtex
 @inproceedings{robinson2024relbench,

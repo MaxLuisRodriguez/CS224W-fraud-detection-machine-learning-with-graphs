@@ -104,7 +104,7 @@ Sizes:
 
 Development uses the **validation** split. RelBench masks test labels by default in `task.get_table("test")` as a leakage guard; the test split is evaluated once, at the end.
 
-**Measured sharing (Module 1, 2026-10-16).** Across 200 random call lists of 128 validation-day users:
+**Measured sharing ([P4](modules/P4-why-these-datasets.md); measured 2026-10-16, reproduced 2026-10-17).** Across 200 random call lists of 128 validation-day users:
 
 - On `rel-event`, **34%** of touched events are shared by 2+ prospects, and a shared cache saves **38%** of event lookups. Friends: 10%.
 - On `rel-avito`, only **0.1%** of ads are shared; categories (88%) and locations (28%) are shared but cost almost nothing to look up. Lists drawn from a single location raise ad sharing only to 3.5%.
@@ -198,7 +198,7 @@ Acceptance is not predictable. Deadlines will be taken from the official sites o
 
 ## 8. CS224W deliverables and rubric map
 
-**Project type 1: Real-world application of GNNs** (blog post + Colab). Solo projects are "discouraged; see Ed", so confirm with course staff before the proposal. Deadlines (Fall 2026 handout §4.1, Pacific time): **proposal Tue Oct 20, 11:59pm** (NeurIPS'22 style, ~2 pages excluding references, no abstract); **milestone Tue Nov 10**; **final Thu Dec 10**. The requirement-by-requirement proposal map is in [Module 1, Part D](modules/01-orientation-and-setup.md#part-d--proposal-requirements-and-how-this-project-meets-them).
+**Project type 1: Real-world application of GNNs** (blog post + Colab). Solo projects are "discouraged; see Ed", so confirm with course staff before the proposal. Deadlines (Fall 2026 handout §4.1, Pacific time): **proposal Tue Oct 20, 11:59pm** (NeurIPS'22 style, ~2 pages excluding references, no abstract); **milestone Tue Nov 10**; **final Thu Dec 10**. The requirement-by-requirement proposal map is in [P8 · Assemble and submit](modules/P8-assemble-and-submit.md#84-requirement-checklist).
 
 | Deliverable | Content |
 |---|---|
@@ -217,25 +217,32 @@ Acceptance is not predictable. Deadlines will be taken from the official sites o
 - **Storage:** one private S3 bucket for checkpoints, results, and figures. RelBench data is re-downloadable and stays on the instance's EBS volume.
 - **IAM:** an instance role scoped to that bucket, plus SSM (backup shell access). Bedrock invoke permission is added later for M3.
 - **Guardrails:** an AWS Budget with **credits excluded**, so it tracks real consumption (a credits-included budget reads $0 and never alerts). A CloudWatch alarm stops the instance after 60 idle minutes. Stop the instance every time you step away.
-- **Spend:** about $1/hr GPU; the debugging dataset also runs on the laptop's CPU environment (Module 1). The whole course arc fits within roughly $1.5k of the ~$9.8k AWS credits. Azure ($10k) stays in reserve.
+- **Spend:** about $1/hr GPU; the debugging dataset also runs on the laptop's CPU environment (P0). The whole course arc fits within roughly $1.5k of the ~$9.8k AWS credits. Azure ($10k) stays in reserve.
 - **Bedrock caveat (M3 only):** Claude on Bedrock is billed through AWS Marketplace, and the general promotional-credit terms exclude Marketplace charges unless a credit explicitly authorizes them (AWS Activate credits are a documented exception). Check the credit's "Applicable products" field before running the LLM comparator; Azure credits are the fallback.
 
 ---
 
 ## 10. Schedule
 
-The step-by-step build lives in [docs/modules](modules/README.md); every step ends with a PASS/STOP check.
+The step-by-step build lives in [docs/modules](modules/README.md); every step ends with a PASS/STOP check. It runs as two tracks.
+
+**Proposal track** (laptop only; one module per proposal bullet of the handout):
+
+| When | Modules | Output |
+|---|---|---|
+| Sat Oct 17 | P0–P7 | Environment; dataset cards and metrics; sharing statistics; RDL model with partial observation; Fig. 1; LightGBM and seed-averaged RDL results on `rel-f1`; every proposal section drafted in `proposal/notes.md` |
+| Sun Oct 18 – **Tue Oct 20** | P8 | Draft Sunday, polish Monday, submit the 2-page proposal Tuesday |
+
+**Build track** (after the proposal):
 
 | When | Module | Output |
 |---|---|---|
-| Fri Oct 16 | 1 Orientation and setup | Repo skeleton, local x64 environment, sharing statistics, proposal map |
-| Sat Oct 17 – Sun Oct 18 | 2 Cloud GPU, data, full-information baseline | AWS guardrails, GPU instance, RelBench baseline numbers on `rel-f1`, `rel-event`, `rel-avito` |
-| Sun Oct 18 – **Tue Oct 20** | Proposal | 2-page proposal submitted |
-| Oct 21 – Oct 27 | 3 Revelation masks + mask-aware training | H2 |
-| Oct 28 – Nov 6 | 4 Heuristic policies + frontiers | H1, H3, H4 |
+| Oct 21 – Oct 25 | B1 Cloud GPU + full-information baselines | AWS guardrails, GPU instance, RDL numbers on `rel-event` and `rel-avito` |
+| Oct 26 – Nov 1 | B2 Lookup environment | `list` / `get` actions keyed on `n_id`, shared cache, budgets |
+| Nov 2 – Nov 9 | B3 Heuristic policies + frontiers | H1, H3, H4 |
 | **Tue Nov 10** | Milestone | Code + report draft |
-| Nov 11 – Nov 24 | 5 Learned batch value + ablations | H5 |
-| Nov 25 – **Thu Dec 10** | 6 Blog post + Colab | Final submission |
+| Nov 11 – Nov 24 | B4 Learned batch value + Zhou-style baseline | H5 |
+| Nov 25 – **Thu Dec 10** | B5 Blog post + Colab | Final submission |
 
 ---
 
@@ -254,8 +261,9 @@ The step-by-step build lives in [docs/modules](modules/README.md); every step en
 | Risk | Check | Response |
 |---|---|---|
 | Little headroom: full information ≈ zero lookups on the chosen task | Tasks were pre-selected by v3-leaderboard GNN–LightGBM gap; re-measure on validation Sunday | Shift weight to `rel-stack/user-engagement` (+28 AUROC points on the leaderboard) |
+| Partial-observation training doesn't help (H2) | **Preliminary, 2026-10-17** ([P7](modules/P7-why-appropriate.md)): on `rel-f1` validation, 3 seeds, 20 epochs, rows revealed at random (`drop` mode), the full-trained model degrades gracefully (val AUROC 0.752 ± 0.020 at full information, 0.749 ± 0.010 with 25% of rows, 0.642 ± 0.049 with none) and random-revelation training is no better at any level (0.734 / 0.718 / 0.612). An earlier single-seed comparison that suggested otherwise mixed 10- and 20-epoch runs | Retest with `mask` mode, with policy-chosen lookups (B3), and on `rel-event` / `rel-avito` (B1). If it still doesn't help, report it and use the full-trained model as the predictor; the claim rests on chosen, budgeted retrieval (C1), not on random-removal robustness |
 | Coverage heuristic ≈ oracle-greedy | Frontier comparison | The problem is easy there; report it and pivot the paper toward C1 (protocol + finding) |
 | LBV doesn't beat the best heuristic | Milestone gate | Report it honestly; the course project is still complete. Try nonmyopic M3 only if oracle headroom exists |
-| GPU vCPU quota is 0 on a new account | L0 quota check | Request an increase tonight; run L2–L3 on a CPU instance meanwhile (`rel-f1` is small) |
+| GPU vCPU quota is 0 on a new account | B1 Level 0 quota check | Request an increase right away; run B1 Levels 2–3 on a CPU instance meanwhile (`rel-f1` is small) |
 | Solo-project policy | Ask on Ed | Adjust scope if required |
 | Confidential material | SCOUT is private | Never copy SCOUT code, interview notes, or customer data into this public repo |

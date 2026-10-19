@@ -1,8 +1,8 @@
-# Module 2 · Cloud GPU, data, and the full-information baseline
+# B1 · Cloud GPU and full-information baselines
 
-**Prerequisite:** [Module 1](01-orientation-and-setup.md) (repo skeleton, local environment, `scripts/check_env.py`, first commit pushed).
+**Build track, after the proposal.** **Prerequisites:** [P0](P0-setup.md) (repo skeleton, local environment, `scripts/check_env.py`, commits pushed) and [P5](P5-which-model.md)–[P7](P7-why-appropriate.md) (`text.py`, `data.py`, `model.py`, `reveal.py`, `train_rdl.py`, all committed).
 
-**Goal:** a GPU instance on AWS running the same code as your laptop, a PyG graph built from RelBench, and the "fetch everything" baseline: the upper bound every lookup budget is measured against.
+**Goal:** a GPU instance on AWS running the same code as your laptop, and the "fetch everything" baseline on the two primary datasets, `rel-event` and `rel-avito`, which are too big for the laptop: the upper bound every lookup budget is measured against.
 
 You type every line yourself. Every block explains what it does and why. Each level ends with a **PASS** check (what you should see) and a **STOP** rule (what to do if you don't). Paste STOP output back into the chat.
 
@@ -234,7 +234,7 @@ aws ec2 authorize-security-group-ingress --group-id $SG --protocol tcp --port 22
 
 ## Level 1 — Launch the GPU instance (laptop, ~20 min)
 
-The instance clones your repo from GitHub, so make sure Module 1's commit is pushed. Commit anything new from Level 0 first (`infra/aws/*.json`; the `*.local.json` file stays ignored):
+The instance clones your repo from GitHub, so make sure your P0–P8 commits are pushed. Commit anything new from Level 0 first (`infra/aws/*.json`; the `*.local.json` file stays ignored):
 
 ```powershell
 git status            # NO .pem or *.local.json files should appear
@@ -355,7 +355,7 @@ ssh wtl nvidia-smi
 We pin the exact stack RelBench's own GPU environment is tested with: **PyTorch 2.9.1 + CUDA 12.8**, Python 3.12. The AMI's newer driver runs CUDA 12.8 code fine. Why not the AMI's preinstalled torch 2.14? Nobody has tested it with `pytorch-frame` 0.3. Debugging version skew at midnight is not the research question.
 
 ```bash
-# uv: a fast Python/env manager (the same tool SCOUT uses). Installs to ~/.local/bin.
+# uv: a fast Python/env manager (the same one you used on the laptop in P0). Installs to ~/.local/bin.
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
 
@@ -379,7 +379,7 @@ uv pip install "relbench[example]==3.0.2"
 uv pip install pyg-lib --find-links https://data.pyg.org/whl/torch-2.9.0+cu128.html
 ```
 
-Smoke test: run the check you wrote in Module 1 (it came down with `git clone`):
+Smoke test: run the check you wrote in P0 (it came down with `git clone`):
 
 ```bash
 python scripts/check_env.py
@@ -395,335 +395,87 @@ aws s3 ls s3://wtl-<ACCOUNT>-usw2/ && echo "S3 OK"
 
 ### 2.1 Install your package
 
-`pyproject.toml` and `src/wtl/__init__.py` already exist from Module 1, so one editable install makes `import wtl` work here too:
+`pyproject.toml` and `src/wtl/` already exist from P0–P7, so one editable install makes `import wtl` work here too:
 
 ```bash
-uv pip install -e .     # editable: code edits take effect without reinstalling
-mkdir -p outputs        # training results land here (Git-ignored; synced to S3)
+uv pip install matplotlib pytest   # figures and tests, as on the laptop (P0 step 6)
+uv pip install -e .                # editable: code edits take effect without reinstalling
+mkdir -p outputs                   # training results land here (Git-ignored; synced to S3)
+python -m pytest tests             # P3 and P7's tests: 3 should pass here too
 ```
 
 ---
 
-## Level 3 — From database to graph (~30 min)
+## Level 3 — The same graph code, on the GPU (~20 min, plus a long first build)
 
-### 3.1 `src/wtl/text.py`: text columns to vectors
+You already wrote the graph and model code on the laptop: `text.py` and `data.py` in P5, `model.py` and `reveal.py` in P6, `train_rdl.py` and `summarize_runs.py` in P7. They came down with `git clone`, so there's nothing new to type here. This level checks that the instance builds the same graph as the laptop, then builds the two big graphs once so their tensors are cached.
 
-RelBench tables contain text (names, ad titles). `pytorch-frame` needs a function that turns a list of strings into a tensor. RelBench's examples use 300-d averaged GloVe word vectors: fast, no GPU needed, ~480 MB downloaded once.
-
-```python
-"""Text embedder used when RelBench text columns are materialized into tensors."""
-from typing import List, Optional
-
-import torch
-from sentence_transformers import SentenceTransformer
-from torch import Tensor
-
-
-class GloveTextEmbedding:
-    """Callable that maps a batch of strings to 300-d averaged GloVe vectors."""
-
-    def __init__(self, device: Optional[str] = None):
-        # Downloads the model from Hugging Face on first use, then reuses the local cache.
-        self.model = SentenceTransformer(
-            "sentence-transformers/average_word_embeddings_glove.6B.300d", device=device
-        )
-
-    def __call__(self, sentences: List[str]) -> Tensor:
-        # Text columns can hold None/NaN; the tokenizer needs real strings, so map missing values to "".
-        cleaned = ["" if s is None or (isinstance(s, float) and s != s) else str(s) for s in sentences]
-        return self.model.encode(cleaned, convert_to_tensor=True)
-```
-
-### 3.2 `src/wtl/data.py`: load, type, graph, and batch
-
-```python
-"""Load a RelBench database and task, and turn it into a PyG heterogeneous temporal graph.
-
-Graph layout (RelBench "relational deep learning"):
-  * one node type per table, one node per row, row features in data[table].tf (a TensorFrame)
-  * one edge type per foreign key, both directions: (child, "f2p_<fkey>", parent) and its "rev_" reverse
-  * data[table].time holds each row's timestamp (Unix seconds) wherever the table has a time column
-"""
-import json
-from pathlib import Path
-
-from relbench import load_dataset
-from relbench.modeling.graph import get_node_train_table_input, make_pkey_fkey_graph
-from relbench.modeling.utils import get_stype_proposal
-from torch_frame import stype
-from torch_frame.config.text_embedder import TextEmbedderConfig
-from torch_geometric.loader import NeighborLoader
-
-from wtl.text import GloveTextEmbedding
-
-# Our own cache for column types and materialized tensors (RelBench's raw data lives in ~/.cache/huggingface).
-CACHE_ROOT = Path.home() / ".cache" / "wtl"
-
-
-def load(dataset_name: str, task_name: str):
-    """Download (first time only) and return the dataset, the task, and the database."""
-    dataset = load_dataset(dataset_name)   # RelBench 3.x: fetched from the Hugging Face Hub
-    task = dataset.load_task(task_name)    # task tables: (entity id, timestamp, label) rows per split
-    db = dataset.get_db()                  # all tables, cut at the test timestamp (no future rows)
-    return dataset, task, db
-
-
-def column_stypes(db, dataset_name: str) -> dict:
-    """Semantic type per column (numerical / categorical / text / timestamp ...), cached as JSON."""
-    path = CACHE_ROOT / dataset_name / "stypes.json"
-    if path.exists():
-        raw = json.loads(path.read_text())
-        # JSON stores each type's value (e.g. "numerical"); rebuild the torch_frame enum from it.
-        return {table: {col: stype(s) for col, s in cols.items()} for table, cols in raw.items()}
-    proposal = get_stype_proposal(db)      # RelBench's heuristic guess from each column's dtype and content
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # stype is a plain Enum: save .value ("numerical"), not str() ("stype.numerical"), or reloading breaks.
-    serializable = {table: {col: st.value for col, st in cols.items()} for table, cols in proposal.items()}
-    path.write_text(json.dumps(serializable, indent=2))
-    return proposal
-
-
-def build_graph(db, dataset_name: str, task, col_to_stype: dict):
-    """Materialize every table into tensors and connect rows by their primary/foreign keys."""
-    data, col_stats = make_pkey_fkey_graph(
-        db,
-        col_to_stype_dict=col_to_stype,
-        # Text columns go through GloVe on CPU, 256 strings at a time.
-        text_embedder_cfg=TextEmbedderConfig(text_embedder=GloveTextEmbedding(device="cpu"), batch_size=256),
-        # Materialized tensors are cached per dataset; the slow step only runs once.
-        cache_dir=str(CACHE_ROOT / dataset_name / "materialized"),
-        # Columns that would leak this task's label are dropped (applied after the cache, so one cache serves all tasks).
-        remove_columns=task.hidden_columns(),
-    )
-    return data, col_stats   # col_stats: per-column statistics the encoders use for normalization
-
-
-def make_loader(data, task, split: str, num_neighbors=(128, 64), batch_size: int = 512, shuffle: bool = False):
-    """Mini-batches of target entities, each with its sampled 2-hop temporal neighborhood."""
-    table = task.get_table(split)          # keep this: get_table is not cached in 3.x
-    table_input = get_node_train_table_input(table=table, task=task)
-    loader = NeighborLoader(
-        data,
-        num_neighbors=list(num_neighbors), # up to 128 neighbors per edge type at hop 1, 64 at hop 2
-        time_attr="time",                  # sample only rows whose time <= the seed's prediction time
-        input_nodes=table_input.nodes,     # (entity table name, row indices of the targets)
-        input_time=table_input.time,       # each target's prediction timestamp
-        transform=table_input.transform,   # attaches labels as batch[entity_table].y
-        batch_size=batch_size,
-        temporal_strategy="uniform",       # among eligible past neighbors, sample uniformly
-        shuffle=shuffle,
-        num_workers=0,
-    )
-    return loader, table
-```
-
-### 3.3 `scripts/explore.py`: look before you model
-
-```python
-"""Level 3 check: print the database schema, the task, and the resulting graph."""
-import argparse
-
-from wtl.data import build_graph, column_stypes, load
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--dataset", default="rel-f1")
-parser.add_argument("--task", default="driver-top3")
-args = parser.parse_args()
-
-dataset, task, db = load(args.dataset, args.task)
-print("tasks in this dataset:", dataset.get_task_names())
-
-# The schema: each table's size, primary key, foreign keys (= graph edges), and time column.
-for name, table in db.table_dict.items():
-    print(f"{name:24s} rows={len(table.df):>10,}  pkey={table.pkey_col}  "
-          f"fkeys={table.fkey_col_to_pkey_table}  time={table.time_col}")
-
-# The task: which entity we score, what label, and over what horizon.
-print(f"\nentity={task.entity_table}.{task.entity_col}  target={task.target_col}  horizon={task.timedelta}")
-for split in ["train", "val"]:  # never peek at test
-    df = task.get_table(split).df
-    print(f"{split:5s} rows={len(df):,}  positive rate={df[task.target_col].mean():.3f}  "
-          f"prediction times={df[task.time_col].nunique()}")
-
-# The graph PyG will train on: node types with counts, and edge types (foreign keys, both directions).
-data, _ = build_graph(db, args.dataset, task, column_stypes(db, args.dataset))
-print("\n", data)
-```
+### 3.1 Same graph as the laptop
 
 ```bash
-python scripts/explore.py --dataset rel-f1 --task driver-top3
+python scripts/inspect_graph.py --dataset rel-f1 --task driver-top3
 ```
 
-**PASS:**
-
-- 9 tables (races, circuits, drivers, constructors, results, standings, …) with foreign keys.
-- `entity=drivers.driverId`.
-- Train and val positive rates.
-- A `HeteroData(...)` printout with `f2p_…` / `rev_f2p_…` edge types.
-
+**PASS:** the same output as P5 step 5.5: `races` with 820 nodes, 26 edge types, about 630 sampled race rows of which about 178 are distinct, and `model parameters: 5,074,945` (P6's model, with the `[MASK]` vectors).
 **STOP:** any traceback. Paste it to me.
 
----
+### 3.2 Build and cache the two primary graphs
 
-## Level 4 — Full-information baseline (~30 min)
-
-This is the **"fetch everything" upper bound** every budgeted policy is measured against. If it doesn't roughly match RelBench's number, nothing built later can be trusted.
-
-### 4.1 `src/wtl/model.py`
-
-```python
-"""Relational deep learning model: per-table encoders -> time encoding -> hetero GraphSAGE -> MLP head."""
-import torch
-from relbench.modeling.nn import HeteroEncoder, HeteroGraphSAGE, HeteroTemporalEncoder
-from torch_geometric.nn import MLP
-
-
-class RDLModel(torch.nn.Module):
-    """Scores target entities from their sampled relational neighborhood (RelBench's baseline design)."""
-
-    def __init__(self, data, col_stats, channels: int = 128, num_layers: int = 2, aggr: str = "sum"):
-        super().__init__()
-        # One tabular encoder (torch_frame ResNet) per table: row columns -> a `channels`-d vector.
-        self.encoder = HeteroEncoder(
-            channels=channels,
-            node_to_col_names_dict={nt: data[nt].tf.col_names_dict for nt in data.node_types},
-            node_to_col_stats=col_stats,
-        )
-        # Encodes "how long before the prediction time" each row happened (recency matters).
-        self.temporal_encoder = HeteroTemporalEncoder(
-            node_types=[nt for nt in data.node_types if "time" in data[nt]], channels=channels,
-        )
-        # Message passing over every foreign-key edge type: one SAGEConv per edge type, summed per layer.
-        self.gnn = HeteroGraphSAGE(
-            node_types=data.node_types, edge_types=data.edge_types,
-            channels=channels, aggr=aggr, num_layers=num_layers,
-        )
-        # Linear readout to one logit per target entity.
-        self.head = MLP(channels, out_channels=1, norm="batch_norm", num_layers=1)
-
-    def forward(self, batch, entity_table: str) -> torch.Tensor:
-        seed_time = batch[entity_table].seed_time            # prediction time of each target in the batch
-        x_dict = self.encoder(batch.tf_dict)                  # {table: [num_rows_in_batch, channels]}
-        rel_time = self.temporal_encoder(seed_time, batch.time_dict, batch.batch_dict)
-        for node_type, t in rel_time.items():
-            x_dict[node_type] = x_dict[node_type] + t        # add recency information to each row
-        x_dict = self.gnn(x_dict, batch.edge_index_dict)      # 2 rounds of message passing
-        # The first len(seed_time) rows of the entity table are the targets themselves.
-        return self.head(x_dict[entity_table][: seed_time.size(0)]).view(-1)
-```
-
-### 4.2 `scripts/train_full.py`
-
-```python
-"""Level 4: train the full-information RDL baseline and save validation results."""
-import argparse
-import json
-import time
-from pathlib import Path
-
-import torch
-from relbench.base import TaskType
-from torch.nn import BCEWithLogitsLoss
-from torch_geometric.seed import seed_everything
-from tqdm import tqdm
-
-from wtl.data import build_graph, column_stypes, load, make_loader
-from wtl.model import RDLModel
-
-
-@torch.no_grad()
-def predict(model, loader, entity_table: str, device) -> "numpy.ndarray":
-    """Probabilities for every row of the loader's table, in table order (the loader is unshuffled)."""
-    model.eval()
-    probs = [torch.sigmoid(model(batch.to(device), entity_table)).cpu() for batch in loader]
-    return torch.cat(probs).numpy()
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", default="rel-f1")
-    parser.add_argument("--task", default="driver-top3")
-    parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--lr", type=float, default=0.005)
-    parser.add_argument("--batch_size", type=int, default=512)
-    parser.add_argument("--max_steps", type=int, default=2000)   # cap per epoch for big datasets
-    parser.add_argument("--seed", type=int, default=42)
-    args = parser.parse_args()
-
-    seed_everything(args.seed)                                   # Python, NumPy, and torch RNGs
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    dataset, task, db = load(args.dataset, args.task)
-    assert task.task_type == TaskType.BINARY_CLASSIFICATION, "this script handles binary tasks"
-    data, col_stats = build_graph(db, args.dataset, task, column_stypes(db, args.dataset))
-    train_loader, _ = make_loader(data, task, "train", batch_size=args.batch_size, shuffle=True)
-    val_loader, val_table = make_loader(data, task, "val", batch_size=args.batch_size)
-
-    model = RDLModel(data, col_stats).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    loss_fn = BCEWithLogitsLoss()                                # binary cross-entropy on raw logits
-
-    best = {"val_roc_auc": -1.0}
-    out_dir = Path("outputs") / args.dataset / args.task
-    out_dir.mkdir(parents=True, exist_ok=True)
-    start = time.time()
-
-    for epoch in range(1, args.epochs + 1):
-        model.train()
-        loss_sum, count = 0.0, 0
-        for step, batch in enumerate(tqdm(train_loader, desc=f"epoch {epoch}", leave=False)):
-            if step >= args.max_steps:
-                break
-            batch = batch.to(device)
-            logits = model(batch, task.entity_table)
-            loss = loss_fn(logits, batch[task.entity_table].y.float())
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            loss_sum += loss.item() * logits.numel()
-            count += logits.numel()
-
-        # RelBench computes the official metrics (roc_auc etc.) against the val labels.
-        metrics = task.evaluate(predict(model, val_loader, task.entity_table, device), val_table)
-        print(f"epoch {epoch:02d}  train_loss={loss_sum / count:.4f}  val={metrics}")
-
-        if metrics["roc_auc"] > best["val_roc_auc"]:             # keep the best epoch, not the last
-            best = {"val_roc_auc": metrics["roc_auc"], "epoch": epoch, **{f"val_{k}": v for k, v in metrics.items()}}
-            torch.save(model.state_dict(), out_dir / f"full_seed{args.seed}.pt")
-
-    best.update(vars(args), minutes=(time.time() - start) / 60, device=str(device))
-    (out_dir / f"full_seed{args.seed}.json").write_text(json.dumps(best, indent=2, default=str))
-    print("BEST:", json.dumps(best, default=str))
-
-
-if __name__ == "__main__":
-    main()
-```
+The first build turns every table into tensors and embeds every text column with GloVe, then caches the result in `~/.cache/wtl/<dataset>/`. On `rel-avito` that includes ~6M ad titles, so it takes a while. Run both builds in `tmux` so they survive closing VS Code, and watch memory in a second terminal with `free -h`:
 
 ```bash
-python scripts/train_full.py --dataset rel-f1 --task driver-top3
+tmux new -s build                # a terminal session that lives on the server
+source ~/wtl/.venv/bin/activate && cd ~/wtl
+python -u scripts/inspect_graph.py --dataset rel-event --task user-ignore 2>&1 | tee outputs/build_rel-event.log
+python -u scripts/inspect_graph.py --dataset rel-avito --task user-clicks 2>&1 | tee outputs/build_rel-avito.log
+# Detach with Ctrl+b then d. Reattach later with: tmux attach -t build
+```
 
-# Back up results (JSON + checkpoint) to S3 under a per-dataset prefix.
+`python -u` turns off output buffering, so the log fills as the run goes instead of all at the end.
+
+**PASS:** each log ends with a mini-batch table and a parameter count. Look at the `rel-event` batch: how many sampled `events` rows are duplicates? That's P5's disjoint-sampling point on the dense dataset, and P4's sharing statistic seen from inside the model.
+**STOP:** an out-of-memory kill (the log just stops, and `dmesg | tail` mentions `oom`). Stop the instance, resize it to `g6.4xlarge` (64 GiB) for this step only, and rerun.
+
+> Levels 3.2 and 4.2 haven't been run yet: the laptop can't build these two graphs. Expect to debug once.
+
+---
+
+## Level 4 — Full-information baselines (~30 min, plus overnight)
+
+`scripts/train_rdl.py --train_reveal full` is the "fetch everything" model, and it also evaluates that model at every revelation level *p*. Use **20 epochs**: in P7, 10-epoch runs sometimes never left the early loss plateau.
+
+### 4.1 `rel-f1` on the GPU: compare with the laptop
+
+```bash
+python scripts/train_rdl.py --dataset rel-f1 --task driver-top3 --train_reveal full --hide drop --epochs 20 --seed 0
+aws s3 sync outputs s3://wtl-<ACCOUNT>-usw2/outputs     # results (JSON) to S3
+```
+
+**PASS:** p = 1.0 validation AUROC inside the seed spread you measured on the laptop (P7's `summarize_runs.py` table). GPU and CPU runs won't match to the digit: the sampler isn't deterministic even on one machine.
+
+### 4.2 The primary datasets, overnight
+
+```bash
+tmux new -s baselines
+source ~/wtl/.venv/bin/activate && cd ~/wtl
+for seed in 0 1 2; do
+  python -u scripts/train_rdl.py --dataset rel-event --task user-ignore --train_reveal full --hide drop --epochs 20 --seed $seed 2>&1 | tee outputs/rel-event_full_seed$seed.log
+  python -u scripts/train_rdl.py --dataset rel-avito --task user-clicks --train_reveal full --hide drop --epochs 20 --seed $seed 2>&1 | tee outputs/rel-avito_full_seed$seed.log
+done
 aws s3 sync outputs s3://wtl-<ACCOUNT>-usw2/outputs
 ```
 
-**PASS:**
+The idle alarm stops the instance about an hour after the last job ends.
 
-- Ten epochs run, and train loss falls.
-- Best validation AUROC is clearly above 0.5. For reference, the leaderboard *test* AUROC is 0.68; val is a different period with only ~600 rows, so expect noise.
-- `outputs/rel-f1/driver-top3/full_seed42.json` exists and is in S3.
-
-### 4.3 Kick off the primary dataset overnight
-
-`rel-avito` is ~450 MB plus GloVe embeddings for ~6M ad titles, so the first graph build takes a while. Run it inside `tmux` so it survives closing VS Code:
+**PASS:** the next morning,
 
 ```bash
-tmux new -s avito            # a terminal session that lives on the server
-source ~/wtl/.venv/bin/activate && cd ~/wtl
-python scripts/train_full.py --dataset rel-avito --task user-clicks --epochs 10 2>&1 | tee outputs/avito_full.log
-# Detach with Ctrl+b then d. Reattach later with: tmux attach -t avito
+python scripts/summarize_runs.py --dataset rel-event --task user-ignore
+python scripts/summarize_runs.py --dataset rel-avito --task user-clicks
 ```
 
-Watch memory in a second terminal with `free -h`. If it dies with an out-of-memory error, tell me. We'll resize to `g6.4xlarge` (64 GiB) for this dataset only. The idle alarm stops the instance about an hour after the job ends.
+prints three seeds per dataset. Compare the p = 1 column with the leaderboard's GNN numbers (test AUROC 0.804 and 0.666). Validation is a different day, so expect the same ballpark, not a match. The p < 1 columns are your first random-revelation curves on the primary datasets: the full-trained ("mask-naive") side of H2, at scale.
 
-**Module 2 done.** You have the full-information numbers for the proposal. Next, Module 3: revelation masks, the `[MASK]` embeddings, and mask-aware training.
+**STOP:** p = 1 AUROC at or below the leaderboard's LightGBM number (0.773 / 0.548). Paste the training log, and check whether the loss stayed near its epoch-2 value (P7's plateau).
+
+**B1 done.** You have full-information numbers on all three datasets. Next, B2: the lookup environment (`list` / `get` actions keyed on `n_id`, one shared cache, budgets).

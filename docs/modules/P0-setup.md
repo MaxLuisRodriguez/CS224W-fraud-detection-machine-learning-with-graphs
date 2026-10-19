@@ -126,7 +126,7 @@ pytorch-frame 0.3.0 | relbench 3.0.2
 ## 0.5 Commit
 
 ```powershell
-git add pyproject.toml src scripts tests proposal infra
+git add pyproject.toml src scripts proposal infra   # tests/ is still empty; Git can't add an empty folder
 git commit -m "P0: package skeleton and environment check"
 git push
 ```
