@@ -74,3 +74,14 @@ rel-f1 driver-top3  : val positive rate 20.2%
 - Average precision: how concentrated the positives are at the top; random equals the positive rate.
 - Precision@K over 200 random lists of N = 128, with K = ceiling 0.1*N = 13 here, the calls a rep makes first. ALways reported next to the base rate.
 - Headline: the budget frontier, each metric against lookups per prospect, one curve per policy, plus the area under it.
+
+### Why this model fits
+relational data is used directly through message passing over foreign keys, and the GNN beats a target-row-only model. Temporal sampling prevents label leakage, verified by a unit test. Shared entities carry the same row id across targets, so one fetch reveals them to all. The same trained model runs at any level of retrieval. Limit: so far rows are hidden at random, on one small datatset.
+
+## §4 Evaluation plan and preliminary results
+
+### Evaluation plan
+Budget frontiers for random, case-local round-robin, uncertainty-first, coverage, a Zhou-style singleton scorer, the learned batch value, oracle-greedy, and full information. Ablations: training regime, stubs vs. removal, batch vs. per-prospect credit. Architectures: GraphSAGE, GAT, LightGBM. Subsets: cold starts, sharing level, list size. H1--H5 one line each. Final results with five seeds.
+
+### Preliminary results
+Table 2's three columns, labeled "rel-f1 validation, 3 seeds, 20 epochs, rows revealed at random". H1 consistent (25% keeps ~97% of the gap); H2 not supported here; LightGBM wins at zero lookups through identity features; runs vary by 0.021--0.05, hence the seeds.
