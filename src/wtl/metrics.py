@@ -75,7 +75,8 @@ def call_list_metrics(y_true, scores, list_size: int = 128, num_lists: int = 200
         p_at_k.append(precision_at_k(y,s,k)) # always defined
 
         if 0 < y.sum() < len(y):
-            auroc.append(average_precision_score(y, s))
+            auroc.append(roc_auc_score(y, s))
+            ap.append(average_precision_score(y, s))
 
-        return {"auroc": float(np.mean(auroc)), "ap": float(np.mean(ap)), f"p@{k}": float(np.mean(p_at_k)),
-                "list_scored": len(auroc)}
+    return {"auroc": float(np.mean(auroc)), "ap": float(np.mean(ap)), f"p@{k}": float(np.mean(p_at_k)),
+            "lists_scored": len(auroc)}
