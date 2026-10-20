@@ -50,3 +50,27 @@ Given a call list of N prospects and a budget of B lookups, which lookups should
 
 **Public availability:** (where they're hosted, that no login is needed, the original sources, and that you don't re-host)
 
+## §2.1 Dataset, task, and metric
+
+### Tasks at a glance
+rel-event user-ignore : val positive rate 11.1%
+rel-avito user-clicks : val positive rate 3.5%
+rel-f1 driver-top3  : val positive rate 20.2%
+
+### Schemas
+- rel-event: prospects are users. Attendance records (11.2 million (M)), friendships (30.4M), interest clicks (15k), and created events point at them. Two hops away sit the events they responded to and their friends. Friendships have no timestamp, so they're always visible. 
+
+-rel-avito: prospects are users. Searches (2.6M), ad visits (6.5M) and phone-number requests (303k) point at them. Two hops away sit the ads they visited or requested, the cateogires and locations of their searches, and the ads shown in their searches.
+
+- rel-f1: prospects are drivers. Results, standings and qualifiying rows point at them. Two hops away sit races and constructors; circuits are three hops. out of a 2-layer GNN's reach.
+
+### Splits
+- Splits are by time. Train prediction dates are spaced one horizon apart up to the validation cutoff: 22 dates on rel-event, 3 on rel0avit, 59 on rel-f1.
+- Validation is a single day on both primary dataset: 2012-11-21 with 2.013 users. and 2015-05-08 with 21,183 users. That's one day's call list, and lists of 128 are sampled from it.
+- Test is evaluated once, at the end.
+
+### Metrics
+- AUROC: RelBench's official metric, comparable to the leaderboard; 0.5 is random.
+- Average precision: how concentrated the positives are at the top; random equals the positive rate.
+- Precision@K over 200 random lists of N = 128, with K = ceiling 0.1*N = 13 here, the calls a rep makes first. ALways reported next to the base rate.
+- Headline: the budget frontier, each metric against lookups per prospect, one curve per policy, plus the area under it.
