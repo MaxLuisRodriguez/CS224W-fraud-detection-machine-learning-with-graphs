@@ -47,7 +47,7 @@ class RDLModel(torch.nn.Module):
         )
 
         # One learned [mask] vector per table, for rows that exist but haven't been fetched (mask mode)
-        self.mask_emb = torch.nn.ParamterDict(
+        self.mask_emb = torch.nn.ParameterDict(
             {nt: torch.nn.Parameter(torch.zeros(channels)) for nt in data.node_types}
         )
 
@@ -84,7 +84,7 @@ class RDLModel(torch.nn.Module):
         elif revealed is not None and hide == "drop":
             edge_index_dict = {
                 # keep edge only if both ends are revealed
-                (src, rel, dst) : ei[:, revealed[src][ei[0]] & revealed[dist][ei[1]]]
+                (src, rel, dst) : ei[:, revealed[src][ei[0]] & revealed[dst][ei[1]]]
                 for (src, rel, dst), ei in edge_index_dict.items()
             }
 

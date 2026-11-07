@@ -1,6 +1,5 @@
 % CS224W Fall 2026 project proposal (project type 1: real-world application of GNNs).
 % Compile on Overleaf (upload this file, refs.bib, neurips_2022.sty, figures/) or with latexmk -pdf proposal.tex.
-% Before submitting, resolve every "TODO" comment below.
 
 \PassOptionsToPackage{numbers, compress}{natbib}  % numeric citations [1, 2] save space
 \documentclass{article}
@@ -18,112 +17,90 @@
 \usepackage{amsfonts}
 \usepackage{graphicx}
 \usepackage{microtype}
+\usepackage{dsfont}                                % \mathds{1} for the indicator function
+\usepackage{wrapfig}                               % lets Figure 1 sit beside the text
+\usepackage[font=small, skip=4pt]{caption}         % compact captions
 
 \title{Worth the Lookup: Budgeted Relational Retrieval\\for Call-List Prioritization}
 
-\author{%
-  Max Rodriguez\\
-  Stanford University\\
-  \texttt{SUNETID@stanford.edu}  % TODO: your Stanford email
-}
+\author{Max Rodriguez \quad Stanford University \quad \texttt{maxrod@stanford.edu}}
 
 \begin{document}
 \maketitle
+\suppressfloats[t]                                 % keep Table 1 off the top of page 1
+\vspace{-2em}
+\setlength{\abovedisplayskip}{5pt plus 2pt}        % tighter space around displayed equations
+\setlength{\belowdisplayskip}{5pt plus 2pt}
+\setlength{\textfloatsep}{10pt plus 2pt minus 2pt} % less space under Table 1
 
-\noindent\textbf{Project type:} real-world application of GNNs (blog post + Colab).
-\textbf{Group:} Max Rodriguez (individual project). % TODO: confirm on Ed that a solo project is approved.
+\noindent\textbf{Project type:} real-world application of GNNs (blog post + Colab). \textbf{Group:} Max Rodriguez (solo).
 
 \section{Application domain}
 
-Sales teams work through call lists. Before a rep dials, a research agent can prepare each prospect by looking things up: a contact's recent activity, details about their company, signs of buying intent. Every lookup costs something (an enrichment credit, LLM tokens, or seconds of latency before a parallel dialer connects), so no team researches every prospect in depth. The agent has to decide \emph{which lookups to make for the whole list} within a budget.
+\begin{wrapfigure}{r}{0.46\linewidth}
+  \vspace{-1.3em}
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig1_call_list.pdf}
+  \caption{A real call list (\texttt{rel-event}, 2012-11-21): of a random 128-prospect list, the 8 prospects sharing the most events (blue), their 12 most-shared events (orange; larger = shared by more), and two unshared events each (grey). One orange lookup informs several prospects.}
+  \label{fig:calllist}
+  \vspace{-1.2em}
+\end{wrapfigure}
 
-This is a graph problem: sales data are linked tables, and different prospects touch the same accounts, events, and activity. Two things couple the prospects on a list. \emph{Shared entities}: enriching one entity informs every prospect connected to it. \emph{A shared ranking cutoff}: a rep calls the top $K$, so a lookup matters only if it could move a prospect across the cutoff, which depends on everyone else's scores. Researching prospects one at a time ignores both.
+\textbf{Motivation.} Before each call, a sales rep's AI research agent can look up a prospect's recent activity, company details, and buying signals. Lookups cost enrichment credits, LLM tokens, or latency, so no team researches every prospect deeply: the real decision is \emph{which lookups to make for the whole call list} within a budget. That is a graph problem: sales data are linked tables, and prospects on one list often touch the same accounts and events (Figure~\ref{fig:calllist}), which couples them twice. \emph{Shared entities}: enriching one event informs every prospect connected to it. \emph{A shared cutoff}: a rep calls only the top $K$, so a lookup matters only if it can move a prospect across that line, which depends on everyone else's scores. Researching prospects one at a time ignores both.
 
-\textbf{Research question.} Given a call list of $N$ prospects and a budget of $B$ lookups, which lookups should a research agent make so that a graph neural network ranks the list best? We will (i) measure \emph{retrieval-budget frontiers} (ranking quality per lookup spent) for relational GNNs, (ii) train GNNs that stay accurate on partially retrieved neighborhoods, and (iii) compare lookup policies, ending with a learned, batch-aware value model.
+\textbf{Research question and novelty.} Given a call list of $N$ prospects and a budget of $B$ lookups, which lookups should an agent make so a graph neural network (GNN) ranks the list best? Beyond applying an existing GNN, I define retrieval-budgeted prediction on relational data, extend a relational GNN to partial neighborhoods, and learn a policy that credits each lookup for every prospect it informs.
 
-\section{Datasets, task, and metrics}
+\textbf{Datasets (public).} I use three tasks from RelBench~\cite{robinson2024relbench}, a benchmark of real relational databases with temporal splits (Table~\ref{tab:data}): \texttt{user-ignore} (will a user ignore more than two event invitations next week?), \texttt{user-clicks} (will a user click more than one ad in four days, a sign of intent?), and \texttt{driver-top3}, a small development task. All are public on Hugging Face (\texttt{stanford-star/relbench-v1}, no login needed) and come from two Kaggle competitions.\footnote{Event Recommendation Engine Challenge and Avito Context Ad Clicks, on kaggle.com.}
 
-We use RelBench~\cite{robinson2024relbench}, a benchmark of real relational databases with temporal train/validation/test splits and maintained GNN and LightGBM baselines. The data are public: they are hosted openly on Hugging Face (\texttt{stanford-star/relbench-v1}, no login or gating) and were originally released through Kaggle competitions.\footnote{Event Recommendation Engine Challenge and Avito Context Ad Clicks, on kaggle.com.} Our code downloads them; we do not re-host data.
-
-\begin{table}[h]
+\begin{table}[t]
   \centering
   \small
-  \setlength{\tabcolsep}{4pt}
-  \begin{tabular}{@{}lllrrrl@{}}
+  \begin{tabular}{@{}llrrrl@{}}
     \toprule
-    Dataset / task & Rows (tables) & Label (horizon) & Train / val & Val pos. & GNN / LGBM & Shared \\
+    Database / task & Rows (tables) & Train / val targets & Val pos. & GNN / LGBM & Shared \\
     \midrule
-    \texttt{rel-event} / \texttt{user-ignore} & 44.8M (5) & ignores $>$2 invitations (7 d) & 19,239 / 2,013 & 11.1\% & 0.804 / 0.773 & events 34\% \\
-    \texttt{rel-avito} / \texttt{user-clicks} & 24.7M (8) & clicks $>$1 ad (4 d) & 59,454 / 21,183 & 3.5\% & 0.666 / 0.548 & ads 0.1\% \\
-    \texttt{rel-f1} / \texttt{driver-top3} & 97.6K (9) & top-3 qualifying (30 d) & 1,353 / 588 & 20.2\% & 0.680 / 0.649 & -- \\
+    \texttt{rel-event} / \texttt{user-ignore} & 44.8M (5) & 19,239 / 2,013 & 11.1\% & 0.804 / 0.773 & events 34\% \\
+    \texttt{rel-avito} / \texttt{user-clicks} & 24.7M (8) & 59,454 / 21,183 & 3.5\% & 0.666 / 0.548 & ads 0.1\% \\
+    \texttt{rel-f1} / \texttt{driver-top3} & 97.6K (9) & 1,353 / 588 & 20.2\% & 0.680 / 0.649 & -- \\
     \bottomrule
   \end{tabular}
-  \caption{Tasks. GNN / LGBM: test AUROC of RelBench's GNN and of LightGBM on the target row only (RelBench leaderboard). Shared: fraction of entities touched by two or more prospects in random 128-prospect lists from the validation day (mean of 200 lists). \texttt{rel-f1} is a small development dataset.}
+  \caption{Tasks. GNN / LGBM: RelBench test AUROC of its GNN vs.\ LightGBM on the target's own row. Shared: share of entities touched by $\geq$2 prospects in random 128-prospect lists (my measurement).}
   \label{tab:data}
 \end{table}
 
-\textbf{Why these datasets.} (1)~\emph{Headroom}: the GNN clearly beats a model that sees only the target's own row, so retrieving context matters; we exclude tasks without this gap, such as \texttt{rel-event}/\texttt{user-repeat} (0.686 vs.\ 0.689). (2)~\emph{Contrasting sharing}: on \texttt{rel-event} a third of touched events are shared and a shared cache saves 38\% of event lookups, while on \texttt{rel-avito} only 0.1\% of ads are shared, which tests when joint planning helps. (3)~\emph{Sales analogues}: will a prospect ignore outreach next week, or show intent? Both tasks score many entities at once, like a daily call list, and positives are rare (3.5\% on \texttt{rel-avito}), so ranking the top of the list is what matters.
+\textbf{Metrics.} AUROC, RelBench's metric, is the chance a random positive outranks a random negative. Since a rep makes only the first calls, I also report average precision and Precision@$K$, the share of positives among the top $K = \lceil 0.1N \rceil$ (13 of 128), averaged over 200 random lists. Budgeted results are \emph{frontiers} (metric vs.\ lookups per prospect), summarized by area; test data is used once.
 
-\textbf{Metrics.} AUROC (RelBench's official metric), average precision, and Precision@$K$ with $K=\lceil 0.1N \rceil$, averaged over random call lists of $N=128$. For budgeted runs we report each metric against lookups per prospect (the frontier) and the area under it. We tune on validation and evaluate on test once.
+\textbf{Why these datasets.} \emph{Headroom}: on both primary tasks the GNN beats a model that sees only the target's row (+0.031 and +0.118 AUROC), so fetched context matters; I exclude tasks without this gap (e.g., \texttt{user-repeat}). \emph{Contrasting sharing}: on \texttt{rel-event}, 34\% of the events a list touches are shared and a shared cache saves 38\% of event lookups, versus 0.1\% of \texttt{rel-avito} ads, so I can test when joint planning pays.
 
-\section{Graph ML approach}
+\section{Graph ML techniques}
 
-\textbf{Model.} We use relational deep learning (RDL)~\cite{fey2024rdl}, built with RelBench and PyTorch Geometric~\cite{fey2019pyg}. Each row is a node, each primary--foreign-key link is an edge in both directions, and each row keeps its timestamp $\tau(v)$. Neighbors are sampled over two hops (fanouts 128 and 64) using only rows dated no later than the prediction time $t$. A row $v$ of table $T(v)$ is encoded by a per-table tabular encoder plus a time encoding $\phi$, then updated by heterogeneous GraphSAGE~\cite{hamilton2017sage} over relations $\mathcal{R}$; an MLP head turns the target's final vector into a probability:
-\begin{align}
-  h_v^{(0)} &= \mathrm{Enc}_{T(v)}(x_v) + \phi\big(t-\tau(v)\big), \\
-  h_v^{(\ell+1)} &= \mathrm{ReLU}\Big(\mathrm{LN}\Big(\textstyle\sum_{r\in\mathcal{R}} W^{(\ell)}_{r,1} h_v^{(\ell)} + W^{(\ell)}_{r,2} \sum_{u\in\mathcal{N}_r(v)} h_u^{(\ell)}\Big)\Big).
-\end{align}
-
-\textbf{Partial retrieval.} Let $O$ be the set of rows fetched so far. Rows outside $O$ are either removed from message passing or kept as \emph{stubs} with a learned per-table vector:
+\textbf{Model.} I use relational deep learning (RDL)~\cite{fey2024rdl}, built with RelBench and PyTorch Geometric (PyG)~\cite{fey2019pyg}. Each table row is a node $v$ with table type $T(v)$, features $x_v$ (its columns), and timestamp $\tau(v)$; each primary--foreign-key link is an edge in both directions, typed by its relation $r \in \mathcal{R}$. To score a prospect at time $t$, PyG's \texttt{NeighborLoader} samples up to 128, then 64, neighbors per relation over two hops, from rows dated at or before $t$. A row starts as $h_v^{(0)} = \mathrm{Enc}_{T(v)}(x_v) + \phi(t - \tau(v))$, a per-table encoder of its columns plus an encoding $\phi$ of its age, so recency matters. Two heterogeneous GraphSAGE layers~\cite{hamilton2017sage} then update each node from its neighbors $\mathcal{N}_r(v)$ per relation:
 \begin{equation}
-  \tilde h_v^{(0)} = m_v\, h_v^{(0)} + (1-m_v)\, e^{\mathrm{mask}}_{T(v)}, \qquad m_v = \mathbb{1}[v\in O].
+  h_v^{(\ell+1)} = \mathrm{ReLU}\Big(\mathrm{LN}\Big(\textstyle\sum_{r \in \mathcal{R}} \big[ W^{(\ell)}_{r,1} h_v^{(\ell)} + W^{(\ell)}_{r,2} \sum_{u \in \mathcal{N}_r(v)} h_u^{(\ell)} \big]\Big)\Big).
 \end{equation}
-Temporal sampling draws each target's neighborhood separately, so a shared row appears once per target that touches it (in one batch of 8 \texttt{rel-f1} drivers, 629 sampled race rows were only 176 distinct races). We therefore key $O$ on original row ids, so one fetch reveals every copy.
+Each relation has its own weights (``attended'' vs.\ ``friend of'') and LN is layer normalization; after two layers, a linear head maps the prospect's vector to a probability $f_\theta(q)$.
 
-\textbf{Lookups and policies.} There are two actions, each costing one unit: \emph{pull} a prospect's recent rows from one table, or \emph{enrich} an entity referenced by fetched rows. For call list $Q$ with labels $y$ and metric $M$, we seek
+\textbf{Partial retrieval (my extension).} The agent sees only $O$, the rows fetched so far (always including the call list). Other rows are dropped from the graph or kept as \emph{stubs}, known to exist but unfetched:
 \begin{equation}
-  \max_{\pi}\ \mathbb{E}\big[M\big(f_\theta(Q \mid O^{\pi}_{B}),\, y\big)\big] \quad\text{s.t.}\quad |O^{\pi}_{B}| - |O_0| \le B.
+  \tilde h_v^{(0)} = m_v\, h_v^{(0)} + (1 - m_v)\, e^{\mathrm{mask}}_{T(v)}, \qquad m_v = \mathds{1}[v \in O].
 \end{equation}
-Baselines: random; case-local round-robin ($B/N$ lookups per prospect); uncertainty-first; coverage (most-shared entity first); per-prospect acquisition~\cite{norcliffe2025sefa,valancius2024aco}; a singleton-value scorer~\cite{zhou2026scout}; oracle-greedy (uses labels; diagnostic only); and full information. Our policy learns the \emph{batch} value of a lookup, the loss reduction summed over the list, by regression on oracle values from training lists, and applies it greedily:
+A stub gets a learned per-table placeholder, so the model can tell ``unfetched'' from ``absent.''
+
+\textbf{Lookup policies.} A lookup $a$ costs one unit: \emph{pull} a prospect's rows from one table, or \emph{enrich} an entity that fetched rows point to. For a list $Q = \{q_1, \dots, q_N\}$ with labels $y_i$, a policy $\pi$ picks lookups in sequence; with $O^\pi_B$ its rows revealed after $B$ lookups and $M$ a ranking metric, I seek $\max_\pi \mathbb{E}[M(f_\theta(Q \mid O^\pi_B), y)]$. Its \emph{batch value} is the list-wide drop in cross-entropy $\ell$:
 \begin{equation}
-  V(a\mid O)=\textstyle\sum_{i\in Q}\big[\ell\big(f_\theta(q_i\mid O),y_i\big)-\ell\big(f_\theta(q_i\mid O\cup\{a\}),y_i\big)\big].
+  V(a \mid O) = \textstyle\sum_{i=1}^{N} \big[ \ell\big(f_\theta(q_i \mid O), y_i\big) - \ell\big(f_\theta(q_i \mid O \cup \{a\}), y_i\big) \big].
 \end{equation}
+Summing credits a shared entity for every prospect it informs, which per-prospect methods miss. $V$ needs labels, so I compute it on training lists and train a second GNN to predict it from the revealed graph; at test time the policy takes the highest-predicted lookup, then re-scores.
 
-\textbf{Why this model fits.} Message passing over foreign keys uses relational data directly, without hand-built aggregates. Temporal sampling prevents label leakage, which a unit test checks. Shared entities are shared rows, so one fetch's value to several prospects is explicit, and stubs separate ``exists but not fetched'' from ``absent''.
+\textbf{Why these models fit.} Message passing uses the database's links, not hand-built features; temporal sampling prevents leakage; shared entities are shared nodes; and one model serves any budget.
 
-\textbf{Related work.} RDL assumes the whole database is available at prediction time; KumoRFM-2 tests random removal of features and links~\cite{hudovernik2026kumorfm2} and STEER prunes context to save compute~\cite{mohamed2026steer}, but neither chooses costed lookups. Active feature acquisition works per instance~\cite{norcliffe2025sefa,valancius2024aco,feng2026brig} or per cohort without shared entities~\cite{rheude2025cama}. The closest graph method values each node query independently on homogeneous dynamic graphs~\cite{zhou2026scout}, and collective active inference acquires labels, not rows~\cite{bilgic2010active}. Stubs build on GNNs with missing features~\cite{rossi2022fp}.
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=0.72\linewidth]{figures/fig1_call_list.pdf}
-  \caption{A real call list as a graph (\texttt{rel-event}, validation day 2012-11-21). From a random list of 128 prospects, the 8 that share the most events with the rest of the list (blue), the 12 most-shared events among them (orange; larger means shared by more of the 8), and two unshared events per prospect (grey). Enriching one orange event informs every prospect connected to it.}
-  \label{fig:calllist}
-\end{figure}
+\textbf{Related work.} RDL assumes full data; KumoRFM-2~\cite{hudovernik2026kumorfm2} and STEER~\cite{mohamed2026steer} drop or prune context and missing-feature GNNs impute~\cite{rossi2022fp}, but none chooses costed lookups. Active feature acquisition is per instance~\cite{norcliffe2025sefa,valancius2024aco,feng2026brig} or per cohort without shared entities~\cite{rheude2025cama}, the closest graph method values node queries independently~\cite{zhou2026scout}, and collective active inference acquires labels, not rows~\cite{bilgic2010active}.
 
 \section{Evaluation plan and preliminary results}
 
-\textbf{Hypotheses.} H1: the frontier is concave (most of the gap recovered with $\le$25\% of rows). H2: training on partial retrieval helps at low budgets. H3: on \texttt{rel-avito}, past search results (which record past clicks) are the most valuable lookups. H4: batch-aware policies beat case-local ones by more on \texttt{rel-event} than on \texttt{rel-avito}. H5: the learned batch value beats the best heuristic and the singleton scorer. Analyses: frontiers per policy; ablations (training regime, stubs vs.\ removal, batch vs.\ per-prospect credit); architectures (GraphSAGE, GAT, LightGBM); subsets (cold starts, sharing level, list size); and which tables each policy fetches.
+\textbf{Baselines, hypotheses, and analyses.} Baselines: random, case-local round-robin ($B/N$ lookups each), uncertainty-first, coverage (most-shared first), per-prospect acquisition~\cite{norcliffe2025sefa,valancius2024aco}, a singleton-value scorer~\cite{zhou2026scout}, oracle-greedy (uses labels; an upper bound), and full information. (H1) Frontiers are concave: 25\% of rows recover most of the full-retrieval gain. (H2) Training on partial retrieval helps at low budgets. (H3) On \texttt{rel-avito}, past search results (which record clicks) are the most valuable lookups. (H4) Batch-aware policies beat case-local ones by more on \texttt{rel-event} than on \texttt{rel-avito}. (H5) The learned batch value beats the best heuristic and the singleton scorer. Analyses: ablations (training regime, stubs vs.\ dropping, batch vs.\ per-prospect credit), GraphSAGE vs.\ GAT vs.\ LightGBM, tables each policy fetches, and subsets (cold-start, sharing, list size).
 
-% TODO: replace these numbers with your own P7 runs (3 seeds, 20 epochs) before submitting.
-\begin{table}[h]
-  \centering
-  \small
-  \begin{tabular}{@{}lccc@{}}
-    \toprule
-    Validation AUROC on \texttt{rel-f1}/\texttt{driver-top3} & all rows ($p=1$) & 25\% of rows & target row only \\
-    \midrule
-    LightGBM, target row only & -- & -- & 0.661 \\
-    GNN, trained on full neighborhoods & 0.752 $\pm$ 0.020 & 0.749 $\pm$ 0.010 & 0.642 $\pm$ 0.049 \\
-    GNN, trained on random partial neighborhoods & 0.734 $\pm$ 0.015 & 0.718 $\pm$ 0.019 & 0.612 $\pm$ 0.025 \\
-    \bottomrule
-  \end{tabular}
-  \caption{Preliminary results. Rows are revealed uniformly at random and hidden rows are removed; mean $\pm$ sd over 3 seeds, 20 epochs each.}
-  \label{tab:prelim}
-\end{table}
-
-\textbf{Preliminary results.} On the development dataset (Table~\ref{tab:prelim}), the GNN with all rows beats LightGBM on the target row by 0.09 AUROC, and a random quarter of the rows keeps nearly all of that, consistent with H1. Training on random partial views did not help, so H2 is not supported here; we will retest it with stubs, chosen lookups, and the primary datasets. With only the target row, LightGBM (which can use driver names as identity categories) stays ahead. Runs vary by 0.02--0.05 AUROC because PyG's temporal sampler is not seeded, so we report means over at least three seeds.
-
-\textbf{Plan.} Full-information baselines on \texttt{rel-event} and \texttt{rel-avito} on an AWS GPU (by Oct 25); a lookup environment with pull/enrich actions and one shared cache (Nov 1); heuristic frontiers and first tests of H1, H3, and H4 (milestone, Nov 10); the learned batch value and ablations (Nov 24); blog post and Colab (Dec 10).
+\textbf{Preliminary results.} On \texttt{driver-top3} (validation AUROC, 3 seeds), the GNN with all rows scores $0.752 \pm 0.020$, 0.09 above LightGBM on the target row (0.661), and $0.749 \pm 0.010$ with a random 25\% of rows (rest dropped), consistent with H1. Training on such views did not help ($0.718 \pm 0.019$ at 25\%), so H2 is unsupported here; I will retest it with stubs and chosen lookups.
 
 \small
 \bibliographystyle{plainnat}
