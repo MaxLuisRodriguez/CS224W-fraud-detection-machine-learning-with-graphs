@@ -1,4 +1,9 @@
-"""Relational deep learning model: per-table encoders -> time encoding -> hetero GraphSAGE -> MLP head."""
+"""Relational deep learning model: per-table encoders -> time encoding -> hetero GraphSAGE -> MLP head.
+The model can also see only part of the graph (M1):
+  hide="drop": unrevealed rows are cut out of message passing (their edges are removed)
+  hide="mask": unrevealed rows stay in the graph as stubs, represented by a learned per-table [MASK] vector
+"""
+
 import torch
 from relbench.modeling.nn import HeteroEncoder, HeteroGraphSAGE, HeteroTemporalEncoder
 from torch_geometric.nn import MLP
@@ -40,11 +45,21 @@ class RDLModel(torch.nn.Module):
             node_types=data.node_types, edge_types=data.edge_types,
             channels=channels, aggr=aggr, num_layers=num_layers,
         )
+
+        # One learned [mask] vector per table, for rows that exist but haven't been fetched (mask mode)
+        self.mask_emb = torch.nn.ParamterDict(
+            {nt: torch.nn.Parameter(torch.zeros(channels)) for nt in data.node_types}
+        )
+
         # MLP(in, out_channels=1, num_layers=1): a single linear layer, 128 numbers -> 1 logit per target.
         self.head = MLP(channels, out_channels=1, norm="batch_norm", num_layers=1)
 
-    def forward(self, batch, entity_table: str) -> torch.Tensor:
-        """Returns one logit per target in the batch (sigmoid of it = probability)."""
+    def forward(self, batch, entity_table: str, revealed: dict = None, hide: str = "drop") -> torch.Tensor:
+        """Returns one logit per target in the batch (sigmoid of it = probability).
+
+        revealed: {table: bool tensor, one entry per sampled row, True = fetched}. None = see every row.
+        hide:     what happens to unfetched rows: "drop" (removed) or "mask" ([MASK] stubs).
+        """
         # batch[entity_table].seed_time: prediction time of each target, shape [num_targets]
         seed_time = batch[entity_table].seed_time
         # batch.tf_dict: {table: TensorFrame of the sampled rows}; encoder -> {table: [rows, 128]}
@@ -55,8 +70,27 @@ class RDLModel(torch.nn.Module):
         rel_time = self.temporal_encoder(seed_time, batch.time_dict, batch.batch_dict)
         for node_type, t in rel_time.items():
             x_dict[node_type] = x_dict[node_type] + t            # Eq. (1): row vector + recency vector
+
         # batch.edge_index_dict: {edge type: [2, num_edges] index pairs} for the sampled subgraph
-        x_dict = self.gnn(x_dict, batch.edge_index_dict)          # Eq. (2), twice: 2 hops reach the target
+        edge_index_dict = batch.edge_index_dict
+
+        if revealed is not None and hide == "mask":
+            for node_type, seen in revealed.items():
+                # unnecessary but ok for style I guess
+                stub = self.mask_emb[node_type].expand_as(x_dict[node_type])
+
+                x_dict[node_type] = torch.where(seen.unsqueeze(-1), x_dict[node_type], stub)
+
+        elif revealed is not None and hide == "drop":
+            edge_index_dict = {
+                # keep edge only if both ends are revealed
+                (src, rel, dst) : ei[:, revealed[src][ei[0]] & revealed[dist][ei[1]]]
+                for (src, rel, dst), ei in edge_index_dict.items()
+            }
+
+
+        # batch.edge_index_dict: {edge type: [2, num_edges] index pairs} for the sampled subgraph
+        x_dict = self.gnn(x_dict, edge_index_dict)          # Eq. (2), twice: 2 hops reach the target
         # The first len(seed_time) rows of the entity table are the targets themselves (the loader puts
         # them first). head -> [num_targets, 1]; .view(-1) flattens to [num_targets].
         return self.head(x_dict[entity_table][: seed_time.size(0)]).view(-1)
