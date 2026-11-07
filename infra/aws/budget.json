@@ -1,0 +1,7 @@
+{
+    "BudgetName": "wtl-monthly",
+    "BudgetLimit": {"Amount": "300", "Unit": "USD"},
+    "TimeUnit": "MONTHLY",
+    "BudgetType": "COST",
+    "CostTypes": { "IncludeCredit": false, "IncludeRefund": false }
+}
