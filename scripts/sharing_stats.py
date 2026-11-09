@@ -2,6 +2,27 @@
 
 For random call lists of N users from a task's validation day, count every entity (ad, event, friend, ...)
 the users touched up to that day, and how many list members touched each one.
+
+Why it matters: if prospects on one list often touch the same entities (the same event, the same ad),
+one lookup about that entity helps several prospects at once. Then it pays to plan lookups for the whole
+list together, with one shared cache, instead of researching each prospect on its own.
+
+How it works: plain SQL over the raw parquet tables, using DuckDB. It does not build the graph or load a
+model. It downloads only the few files it needs from Hugging Face (internet needed the first time).
+Because it reads the raw tables, it sees every touch up to the cutoff; the GNN's sampler keeps at most a
+fixed number of neighbors per prospect, and scripts/check_call_list.py (M6) answers the same question on
+that sampled graph.
+
+How to run (from the repo root):
+    python scripts/sharing_stats.py                                    # rel-avito
+    python scripts/sharing_stats.py --dataset rel-event --num_lists 50
+
+What it prints: the dataset, number of lists, list size and day, then a small table with one row per kind
+of entity (ad, category, location on rel-avito; event, friend on rel-event) and four columns averaged over
+the lists (defined in the "Summarize" section below), and finally the share of prospects with no history
+at all. Sharing shows up as a "shared" share above 0 and a "saved_by_cache" share above 0.
+
+Where it fits: proposal step P4 (why these datasets): it checks the premise before any model is built.
 """
 import argparse
 
@@ -43,6 +64,8 @@ CONFIG = {
         "user_col": "user",
         "files": ["db/event_attendees.parquet", "db/event_interest.parquet", "db/user_friends.parquet"],
         # user_friends has no time column in RelBench, so friendships count as always known.
+        # "user" and "timestamp" are in double quotes because they are SQL keywords; the quotes mark them as
+        # column names. The first SELECT renames its columns (AS ...); the later ones line up by position.
         "touches": """
             SELECT user_id AS UserID, 'event' AS kind, event AS entity
               FROM '{db}/event_attendees.parquet' WHERE start_time <= $cutoff AND event IS NOT NULL
@@ -56,13 +79,14 @@ CONFIG = {
     },
 }
 
+# Command-line options. choices=sorted(CONFIG) only accepts the datasets configured above.
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", default="rel-avito", choices=sorted(CONFIG))
 parser.add_argument("--list_size", type=int, default=128)  # N prospects per call list
 parser.add_argument("--num_lists", type=int, default=200)  # random lists to average over
 parser.add_argument("--seed", type=int, default=0)
 args = parser.parse_args()
-cfg = CONFIG[args.dataset]
+cfg = CONFIG[args.dataset]                      # the settings above for the chosen dataset
 
 # =====================================================================================================
 # Download only the files we need
@@ -143,6 +167,7 @@ cold = con.execute("""
     FROM lists l LEFT JOIN (SELECT DISTINCT UserID FROM touches) t ON l.UserID = t.UserID
 """).fetchone()[0]
 
+# Report: for each kind of entity, the four columns averaged over all the random lists, then the cold starts.
 print(f"{args.dataset}: {args.num_lists} random call lists of {args.list_size} prospects, day {cutoff.date()}\n")
 print(summary.groupby("kind")[["distinct", "per_prospect", "shared", "saved_by_cache"]].mean().round(3))
 print(f"\nprospects with no history (cold starts): {cold:.1%}")
