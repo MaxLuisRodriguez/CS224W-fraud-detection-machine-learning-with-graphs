@@ -44,6 +44,8 @@ parser.add_argument("--metric", default="auroc", choices=["auroc", "ap", "p_at_k
 parser.add_argument("--out", default=None)
 # extra reference lines, e.g. --ref "LightGBM, own row" 0.850 (a zero-lookup model scored on its own lists)
 parser.add_argument("--ref", nargs=2, action="append", metavar=("LABEL", "VALUE"), default=[])
+# name the --ref lines in the legend instead of beside the line (use when a label would overlap another one)
+parser.add_argument("--ref_legend", action="store_true")
 args = parser.parse_args()
 
 # Load the per-list records written by run_frontier.py, and decide where the figure goes.
@@ -122,8 +124,9 @@ ax.minorticks_off()
 ax.text(ticks[0], np.mean(full), " full information", color=MUTED, fontsize=7, va="bottom")
 ax.text(ticks[0], np.mean(zero), " zero lookups", color=MUTED, fontsize=7, va="bottom")
 for label, value in args.ref:                    # optional extra reference lines (dash-dot)
-    ax.axhline(float(value), color=MUTED, lw=1, ls="-.")
-    ax.text(ticks[0], float(value), " " + label, color=MUTED, fontsize=7, va="top", ha="left")
+    ax.axhline(float(value), color=MUTED, lw=1, ls="-.", label=label if args.ref_legend else None)
+    if not args.ref_legend:
+        ax.text(ticks[0], float(value), " " + label, color=MUTED, fontsize=7, va="top", ha="left")
 # Axis labels and quiet styling: small fonts, a light horizontal grid behind the data, no top or right border.
 ax.set_xlabel("lookups per prospect (budget)", fontsize=8, color=INK)
 NAMES = {"auroc": "AUROC", "ap": "Average precision", "p_at_k": "Precision@13"}   # axis label per metric

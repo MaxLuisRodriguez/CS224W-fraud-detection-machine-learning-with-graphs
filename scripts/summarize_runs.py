@@ -42,6 +42,9 @@ for path in sorted((Path("outputs") / args.dataset / args.task).glob("rdl_*_ep*_
     # "args" holds the command-line settings that produced this run.
     a = run["args"]
     config = f"{a['train_reveal']}, {a['hide']}, {a['epochs']} ep"   # one row of the table per configuration
+    # Runs saved with a --tag (e.g. "fix") get their own rows.
+    if a.get("tag"):
+        config += f", {a['tag']}"
     # "val" maps each reveal level p (saved as a string key) to that level's metrics.
     for p, metrics in run["val"].items():
         rows.append({"config": config, "seed": a["seed"], "p":float(p), "value": metrics[args.metric]})

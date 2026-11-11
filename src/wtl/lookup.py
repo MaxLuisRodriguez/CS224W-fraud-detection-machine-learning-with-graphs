@@ -15,6 +15,7 @@ import torch
 from relbench.base import Table
 from relbench.modeling.graph import get_node_train_table_input
 from torch_geometric.loader import NeighborLoader
+from torch_geometric.sampler import NeighborSampler
 
 from wtl.metrics import list_metrics
 
@@ -22,6 +23,20 @@ from wtl.metrics import list_metrics
 #
 # M6 : One call list, one subgraph
 #
+# Building a neighbor sampler converts the whole graph to a sorted (CSC) layout, which takes seconds on
+# rel-event. Scripts that sample hundreds of call lists build it once per graph and reuse it. It is built
+# with exactly the settings NeighborLoader would use (below), so the samples are drawn the same way.
+_SAMPLERS = {}
+
+
+def _sampler(data, num_neighbors):
+    key = (id(data), tuple(num_neighbors))
+    if key not in _SAMPLERS:
+        _SAMPLERS[key] = NeighborSampler(data, num_neighbors=list(num_neighbors), time_attr="time",
+                                         temporal_strategy="uniform")
+    return _SAMPLERS[key]
+
+
 def sample_call_list(data, task, split: str, size: int, seed: int, num_neighbors=(128, 64)):
     """Draw `size` prospects scored at one prediction time and sample all their neighborhoods into one batch.
 
@@ -78,6 +93,7 @@ def sample_call_list(data, task, split: str, size: int, seed: int, num_neighbors
         data, num_neighbors=list(num_neighbors), time_attr="time",
         input_nodes=table_input.nodes, input_time=table_input.time, transform=table_input.transform,
         batch_size=size, temporal_strategy="uniform", shuffle=False,
+        neighbor_sampler=_sampler(data, num_neighbors),
     )
 
     # The loader holds exactly one batch: take it.

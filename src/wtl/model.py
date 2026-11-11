@@ -27,10 +27,15 @@ class RDLModel(torch.nn.Module):
         channels:   size of every row's vector (128)
         num_layers: rounds of message passing = hops of information reaching the target (2)
         aggr:       how a node combines its neighbors' messages within one edge type ("sum")
+        target_time: if False, the targets' own rows get no "how recent" vector. Use it when a target row's
+                    timestamp can postdate the prediction (rel-event's users.joinedAt does for some users),
+                    so the model can't learn from that leak. Neighbors' recency is unaffected.
     """
 
-    def __init__(self, data, col_stats, channels: int = 128, num_layers: int = 2, aggr: str = "sum"):
+    def __init__(self, data, col_stats, channels: int = 128, num_layers: int = 2, aggr: str = "sum",
+                 target_time: bool = True):
         super().__init__()
+        self.target_time = target_time
         # Part 1, row encoder. Turns each row's raw column values into one vector.
         # HeteroEncoder: takes, per table, its column names (grouped by type) and their statistics;
         # builds one torch_frame ResNet per table; at run time maps each table's rows -> [rows, channels].
@@ -93,6 +98,12 @@ class RDLModel(torch.nn.Module):
         # batch.batch_dict: {table: which target each sampled row was sampled for}
         #   (needed because each target has its own prediction time)
         rel_time = self.temporal_encoder(seed_time, batch.time_dict, batch.batch_dict)
+        if not self.target_time and entity_table in rel_time:
+            # Hide the targets' own row ages (the first len(seed_time) rows of the entity table are the
+            # targets). clone() first, so we don't edit a tensor autograd still needs.
+            t = rel_time[entity_table].clone()
+            t[: seed_time.size(0)] = 0
+            rel_time[entity_table] = t
         for node_type, t in rel_time.items():
             x_dict[node_type] = x_dict[node_type] + t            # Eq. (1): row vector + recency vector
 

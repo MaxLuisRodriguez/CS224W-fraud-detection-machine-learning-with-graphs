@@ -35,6 +35,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", default="rel-f1")
 parser.add_argument("--task", default="driver-top3")
 parser.add_argument("--list_size", type=int, default=128)
+# Entity-table columns to leave out of the features, e.g. joinedAt, which can postdate t (default: none).
+parser.add_argument("--drop_cols", nargs="*", default=[])
 args = parser.parse_args()
 
 # Load the dataset, the task (what to predict, for which table) and the database (every table).
@@ -54,6 +56,8 @@ both = both.merge(entity.df, left_on=task.entity_col, right_on=entity.pkey_col, 
 
 # Features = everything except ids, the label, the prediction time, and the split marker.
 drop = {"split", task.entity_col, entity.pkey_col, task.target_col, task.time_col}
+# Also leave out any columns named with --drop_cols.
+drop |= set(args.drop_cols)
 X = both.drop(columns=[c for c in both.columns if c in drop])
 # LightGBM needs numbers or categories, so convert the two column kinds it cannot use directly.
 for col in X.columns:

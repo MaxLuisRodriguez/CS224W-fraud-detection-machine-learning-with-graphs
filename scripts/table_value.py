@@ -31,9 +31,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from wtl.data import build_graph, column_stypes, load
 from wtl.lookup import CallList, sample_call_list
-from wtl.model import RDLModel
+from wtl.runs import load_run
 
 # Command-line options.
 parser = argparse.ArgumentParser()
@@ -44,18 +43,16 @@ parser.add_argument("--run", default="rdl_full_drop_ep20_seed0")
 # How many call lists to average over (seeds 0, 1, 2, ...), and how many prospects per list.
 parser.add_argument("--lists", type=int, default=10)
 parser.add_argument("--size", type=int, default=128)
+# Suffix for the output file, so runs on other models don't overwrite table_value.json.
+parser.add_argument("--name", default="")
 args = parser.parse_args()
 
 # Load the data, build the graph, and load the frozen trained model (the same way as run_frontier.py).
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-dataset, task, db = load(args.dataset, args.task)
-data, col_stats = build_graph(db, args.dataset, task, column_stypes(db, args.dataset))
+# load_run rebuilds the graph and model as the run was trained and switches to evaluation mode.
+task, data, model = load_run(args.dataset, args.task, args.run, device)
 entity = task.entity_table
 out_dir = Path("outputs") / args.dataset / args.task
-model = RDLModel(data, col_stats).to(device)
-model.load_state_dict(torch.load(out_dir / f"{args.run}.pt", map_location=device))
-# Evaluation mode; the weights are never updated here.
-model.eval()
 
 # One result row per (call list, table).
 rows = []
@@ -105,6 +102,6 @@ for table in sorted({r["table"] for r in rows}):
     # "per 100 lookups" = 100 * average gain / average lookups.
     print(f"| {table} | {pc:.0f} | {pg:+.3f} | {100 * pg / pc:+.3f} | {ac:.0f} | {ag:+.3f} | {100 * ag / ac:+.3f} |")
 # Save the raw per-list rows, so the table can be rebuilt or analyzed further later.
-out = out_dir / "table_value.json"
+out = out_dir / (f"table_value_{args.name}.json" if args.name else "table_value.json")
 out.write_text(json.dumps({"args": vars(args), "rows": rows}, indent=1))
 print("\nsaved", out)

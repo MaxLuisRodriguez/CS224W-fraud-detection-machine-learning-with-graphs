@@ -99,7 +99,28 @@ def column_stypes(db, dataset_name: str) -> dict:
 #
 # 3. Build the graph: rows -> nodes with tensor features, foreign keys -> edges
 #
-def build_graph(db, dataset_name: str, task, col_to_stype:dict):
+def drop_columns(col_to_stype: dict, drop) -> dict:
+    """Return a copy of the column types without the listed feature columns.
+
+    Use it to stop the model from reading a column, for example rel-event's users.joinedAt, which for some
+    users is dated after the prediction time. A dropped column is no longer a feature, but a table's time
+    column still decides which rows the sampler may use.
+
+    Args:
+        col_to_stype: {table: {column: stype}} from column_stypes()
+        drop:         columns to remove, each written "table.column" (e.g. ["users.joinedAt"])
+
+    Returns:
+        {table: {column: stype}} without those columns
+    """
+    out = {table: dict(cols) for table, cols in col_to_stype.items()}
+    for name in drop or []:
+        table, col = name.split(".", 1)
+        out[table].pop(col, None)
+    return out
+
+
+def build_graph(db, dataset_name: str, task, col_to_stype:dict, cache_name: str = "materialized"):
     """Turn every table into tensors and connect rows through their primary/foreign keys.
 
     Key columns are not used as features; they only decide which rows get linked. Turning text into
@@ -110,6 +131,8 @@ def build_graph(db, dataset_name: str, task, col_to_stype:dict):
         dataset_name: used only to name the cache folder.
         task: the task from load(); used only to know which columns would leak its label.
         col_to_stype: column types from column_stypes().
+        cache_name: the cache folder's name. Use a different name whenever col_to_stype changes (for
+            example after drop_columns), because a cached table is reloaded as-is, whatever its columns.
 
     Returns:
         data: torch_geometric HeteroData, the whole database as one graph
@@ -128,7 +151,7 @@ def build_graph(db, dataset_name: str, task, col_to_stype:dict):
         # and how many strings to send per call (256).
         text_embedder_cfg=TextEmbedderConfig(text_embedder=GloveTextEmbedding(device="cpu"), batch_size=256),
         # One <table>.pt file per table; if it already exists it is loaded instead of recomputed.
-        cache_dir=str(CACHE_ROOT / dataset_name / "materialized"),
+        cache_dir=str(CACHE_ROOT / dataset_name / cache_name),
         # task.hidden_columns(): columns that would leak this task's label, e.g. a field computed from
         # the future. They're dropped after loading from the cache, so one cache serves every task.
         remove_columns=task.hidden_columns(),

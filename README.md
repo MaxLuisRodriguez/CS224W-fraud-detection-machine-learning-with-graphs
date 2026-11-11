@@ -30,6 +30,7 @@ Datasets download automatically from RelBench on first use.
 | Metrics | [src/wtl/metrics.py](src/wtl/metrics.py) | Precision@K, call-list metrics, per-list AUROC/AP/P@K, bootstrap intervals |
 | Environment | [src/wtl/lookup.py](src/wtl/lookup.py) | A call list sampled once into one subgraph; `pull` and `enrich` lookups with a shared cache, list-before-get, and cost accounting |
 | Policies | [src/wtl/policies.py](src/wtl/policies.py) | Random, case-local, uncertainty-first, coverage (batch-aware), sampled oracle-greedy (uses labels; a reference, not deployable) |
+| Run settings | [src/wtl/runs.py](src/wtl/runs.py) | Rebuilds a trained model exactly as it was trained (same dropped columns and settings), from the settings saved with its weights |
 | Train / evaluate | [scripts/train_rdl.py](scripts/train_rdl.py) | Trains the GNN (full or random retrieval), evaluates at reveal shares p = 1 ... 0, saves metrics and weights |
 | Baseline | [scripts/baseline_lightgbm.py](scripts/baseline_lightgbm.py) | LightGBM on each target's own row: the zero-lookup reference |
 | Frontiers | [scripts/run_frontier.py](scripts/run_frontier.py) | Every policy on the same call lists and subgraphs, metrics at each budget |
@@ -40,25 +41,27 @@ Datasets download automatically from RelBench on first use.
 
 ## Reproduce the milestone results
 
-A GPU is recommended (the report used one NVIDIA L4); loading the `rel-event` graph needs about 40 GB of RAM including swap. Each command writes JSON results and logs under `outputs/`.
+A GPU is recommended (the report used one NVIDIA L4); loading the `rel-event` graph needs about 40 GB of RAM including swap. Each command writes JSON results and logs under `outputs/`. `--drop_cols users.joinedAt --no_target_time` keep the model from seeing a prospect's join date, which for some prospects falls after the prediction time; every reported model is trained this way.
 
 ```bash
 # E1/E2: train the GNN, full and random retrieval, three seeds each
 for seed in 0 1 2; do for regime in full random; do
-  python scripts/train_rdl.py --dataset rel-event --task user-ignore --train_reveal $regime --seed $seed
+  python scripts/train_rdl.py --dataset rel-event --task user-ignore --train_reveal $regime --seed $seed \
+    --drop_cols users.joinedAt --no_target_time --tag fix
 done; done
 python scripts/summarize_runs.py --dataset rel-event --task user-ignore
-python scripts/baseline_lightgbm.py --dataset rel-event --task user-ignore
+python scripts/baseline_lightgbm.py --dataset rel-event --task user-ignore --drop_cols joinedAt
 
 # E3: budget frontiers (100 call lists, budgets up to 16 lookups per prospect) and figures
-python scripts/run_frontier.py --dataset rel-event --task user-ignore --lists 100 --budgets 0.25 0.5 1 2 4 8 16 --name lists100
-python scripts/fig_frontier.py --dataset rel-event --task user-ignore --name lists100 --metric auroc --ref "LightGBM, own row" 0.850
-python scripts/fig_frontier.py --dataset rel-event --task user-ignore --name lists100 --metric p_at_k --ref "LightGBM, own row" 0.545
+python scripts/run_frontier.py --dataset rel-event --task user-ignore --run rdl_full_drop_ep20_seed0_fix --lists 100 --budgets 0.25 0.5 1 2 4 8 16 --name fix_lists100
+python scripts/fig_frontier.py --dataset rel-event --task user-ignore --name fix_lists100 --metric auroc --ref "LightGBM, own row (no joinedAt)" 0.830 --ref_legend
+python scripts/fig_frontier.py --dataset rel-event --task user-ignore --name fix_lists100 --metric p_at_k --ref "LightGBM, own row (no joinedAt)" 0.459 --ref_legend
 
 # E3 with the random-trained model, E4 table values, E5 sharing splits
-python scripts/run_frontier.py --dataset rel-event --task user-ignore --run rdl_random_drop_ep20_seed0 --lists 30 --policies random case_local uncertainty coverage --name random_trained
-python scripts/table_value.py --dataset rel-event --task user-ignore --lists 30
-python scripts/sharing_splits.py --dataset rel-event --task user-ignore --name lists100
+python scripts/run_frontier.py --dataset rel-event --task user-ignore --run rdl_random_drop_ep20_seed0_fix --lists 30 --policies random case_local uncertainty coverage --name fix_random_trained
+python scripts/fig_frontier.py --dataset rel-event --task user-ignore --name fix_random_trained --metric auroc --ref "LightGBM, own row (no joinedAt)" 0.830 --ref_legend --out milestone/figures/frontier_rel-event_auroc_random_trained.pdf
+python scripts/table_value.py --dataset rel-event --task user-ignore --run rdl_full_drop_ep20_seed0_fix --lists 30 --name fix
+python scripts/sharing_splits.py --dataset rel-event --task user-ignore --name fix_lists100
 
 # Checks
 python scripts/check_leakage.py --dataset rel-event --task user-ignore
@@ -68,4 +71,4 @@ python -m pytest tests
 
 ## Status
 
-Milestone (Nov 2026): the relational GNN with partial retrieval, the lookup environment, five policies and the frontier runner are built and tested, and every milestone experiment ran on `rel-event` (see the report). Next: the learned lookup value, stronger batch-aware heuristics, and validity fixes listed in the report's next steps.
+Milestone (Nov 2026): the relational GNN with partial retrieval, the lookup environment, five policies and the frontier runner are built and tested, and every milestone experiment ran on `rel-event` (see the report). Next: the learned lookup value, stronger batch-aware heuristics, and the other items in the report's next steps.

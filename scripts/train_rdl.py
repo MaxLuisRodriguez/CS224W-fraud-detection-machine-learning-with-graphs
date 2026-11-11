@@ -42,6 +42,7 @@ from torch.nn import BCEWithLogitsLoss
 from torch_geometric.seed import seed_everything
 
 from wtl.data import build_graph, column_stypes, load, make_loader
+from wtl.runs import graph_for
 from wtl.metrics import call_list_metrics
 from wtl.model import RDLModel
 from wtl.reveal import random_reveal
@@ -97,6 +98,12 @@ def main():
     parser.add_argument("--seed", type=int, default=0)
     # Reveal levels to evaluate at: 1.0 = every row visible, 0.0 = only the targets' own rows.
     parser.add_argument("--eval_p", type=float, nargs="+", default=[1.0, 0.75, 0.5, 0.25, 0.0])
+    # Feature columns to leave out, each "table.column" (e.g. users.joinedAt, which can postdate predictions).
+    parser.add_argument("--drop_cols", nargs="*", default=[])
+    # Give the targets' own rows no "how recent" vector (their timestamp can postdate the prediction).
+    parser.add_argument("--no_target_time", action="store_true")
+    # Extra label appended to the output file names, to keep variants apart (e.g. "fix").
+    parser.add_argument("--tag", default="")
     args = parser.parse_args()
 
 
@@ -115,7 +122,8 @@ def main():
     # build_graph: each row becomes a node with its columns encoded as tensors; each foreign key becomes
     # an edge. column_stypes says how each column is encoded (number, category, text, date).
     # col_stats holds per-column statistics (means, category lists) that the model's encoders need.
-    data, col_stats = build_graph(db, args.dataset, task, column_stypes(db, args.dataset))
+    # graph_for (wtl/runs.py) builds the graph without any --drop_cols, with its own cache folder in that case.
+    _, data, col_stats = graph_for(args.dataset, args.task, args.drop_cols)
     # Loaders hand out mini-batches of targets, each with its sampled 2-hop neighborhood from before its
     # prediction time. Training batches are shuffled. Validation keeps table order, so the predictions
     # line up with the labels in val_table.
@@ -124,7 +132,7 @@ def main():
 
     # Step 3: the model, the optimizer and the loss.
     # RDLModel encodes each row's columns, then runs a GNN over the sampled graph: one score per target.
-    model = RDLModel(data, col_stats).to(device)
+    model = RDLModel(data, col_stats, target_time=not args.no_target_time).to(device)
     # Adam nudges the weights after every batch; lr sets how big each nudge is.
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     # BCEWithLogitsLoss: binary cross-entropy for 0/1 labels. It takes raw scores (logits) and applies the
@@ -203,6 +211,9 @@ def main():
     # Create the folder (and any missing parent folders); fine if it already exists.
     out_dir.mkdir(parents=True, exist_ok=True)
     stem = f"rdl_{args.train_reveal}_{args.hide}_ep{args.epochs}_seed{args.seed}"
+    # A --tag is appended, so variants don't overwrite each other.
+    if args.tag:
+        stem += f"_{args.tag}"
     # The metrics, as readable JSON.
     (out_dir / f"{stem}.json").write_text(json.dumps(results, indent=2))
     # state_dict() is only the learned weights (a dict of tensors). To reload them, build RDLModel the same

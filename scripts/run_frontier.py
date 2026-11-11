@@ -46,7 +46,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from wtl.data import build_graph, column_stypes, load
+from wtl.runs import load_run
 from wtl.lookup import CallList, fetch_all, sample_call_list
 from wtl.model import RDLModel
 from wtl.policies import POLICIES
@@ -117,17 +117,13 @@ def main():
 
     # Step 1: load the data, build the graph, and load the frozen trained model.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dataset, task, db = load(args.dataset, args.task)
-    data, col_stats = build_graph(db, args.dataset, task, column_stypes(db, args.dataset))
+    # load_run (wtl/runs.py) rebuilds the graph and the model exactly as the run was trained (same dropped
+    # columns, same target-row setting), loads the trained weights, and switches to evaluation mode. The
+    # weights are never updated here.
+    task, data, model = load_run(args.dataset, args.task, args.run, device)
     # The table whose rows are the prospects (users on rel-event).
     entity = task.entity_table
     out_dir = Path("outputs") / args.dataset / args.task
-    # Rebuild the model with the same structure, then load the trained weights into it. map_location puts
-    # the weights on this machine's device, even if they were saved from a GPU.
-    model = RDLModel(data, col_stats).to(device)
-    model.load_state_dict(torch.load(out_dir / f"{args.run}.pt", map_location=device))
-    # Evaluation mode (no training-only behavior such as dropout). The weights are never updated here.
-    model.eval()
 
     # Everything goes into one dict, which is written to disk after each list.
     results = {"args": vars(args), "lists": []}
