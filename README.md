@@ -17,6 +17,10 @@ A sales rep's call list is a graph. Prospects share accounts, events, colleagues
 - **Where to start reading:** the code map below, in pipeline order. Every file opens with a plain-language summary of what it does and where it fits.
 - **Tests:** `python -m pytest tests` (11 tests: metrics, temporal leakage, the lookup environment's guarantees, policy budgets).
 
+## Final results (data files)
+
+The curated per-list results behind the final write-up are in [`results/`](results/README.md): the test day on six RelBench datasets, its replication with value-model seeds and baselines adapted from active feature acquisition, the whole pipeline repeated with three scorer seeds, calibration scores, every results table as CSV, and a synthetic grid that varies entity sharing and wiring.
+
 ## Code map
 
 Everything below runs from the repo root after `pip install -e .`.

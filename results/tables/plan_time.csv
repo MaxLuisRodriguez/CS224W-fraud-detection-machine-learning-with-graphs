@@ -1,0 +1,6 @@
+dataset,random,case-local,uncertainty-first,coverage,breadth-then-share,learned sage,learned gat,learned transformer,learned mlp,learned lgbm,learned knn,per-instance SAGE,EIG what-if (64),oracle (64),EIG what-if (all),oracle (all)
+event,6,5,27,13,0,79,80,80,75,83,227,75,145,146,3013,3890
+stack,10,6,34,20,1,140,142,142,142,151,353,113,173,172,4116,1594
+trial,6,5,38,11,1,132,133,134,133,149,313,134,198,201,2199,2099
+avito,7,9,32,62,16,328,330,345,334,351,1194,248,166,166,—,—
+hm,2,2,14,14,0,79,81,80,79,84,246,60,75,72,2538,958

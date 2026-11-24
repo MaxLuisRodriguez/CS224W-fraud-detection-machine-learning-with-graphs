@@ -1,0 +1,37 @@
+dataset,scorer,training,seeds,AUROC (all rows),AUROC (own row only),P@13 (all rows)
+event,GraphSAGE,full,3,0.836 ± 0.019,0.722 ± 0.018,0.586 ± 0.009
+event,GAT,full,3,0.810 ± 0.012,0.728 ± 0.006,0.528 ± 0.011
+event,Graph Transformer,full,3,0.818 ± 0.014,0.621 ± 0.147,0.522 ± 0.008
+event,GraphSAGE,random,3,0.845 ± 0.024,0.742 ± 0.005,0.573 ± 0.022
+event,GAT,random,3,0.827 ± 0.011,0.742 ± 0.003,0.533 ± 0.030
+event,Graph Transformer,random,3,0.818 ± 0.005,0.723 ± 0.004,0.522 ± 0.018
+event,Flat LightGBM (no graph),random reveal,3,0.856 ± 0.007,0.773 ± 0.019,0.569 ± 0.004
+stack,GraphSAGE,full,3,0.900 ± 0.001,0.652 ± 0.013,0.201 ± 0.001
+stack,GAT,full,3,0.900 ± 0.002,0.622 ± 0.034,0.199 ± 0.001
+stack,Graph Transformer,full,3,0.897 ± 0.002,0.552 ± 0.042,0.197 ± 0.003
+stack,GraphSAGE,random,1,0.900,0.686,0.200
+stack,Flat LightGBM (no graph),random reveal,1,0.892,0.629,0.191
+trial,GraphSAGE,full,3,0.614 ± 0.012,0.581 ± 0.010,0.679 ± 0.017
+trial,GAT,full,3,0.617 ± 0.003,0.552 ± 0.007,0.698 ± 0.011
+trial,Graph Transformer,full,3,0.624 ± 0.023,0.586 ± 0.018,0.683 ± 0.048
+trial,GraphSAGE,random,3,0.591 ± 0.013,0.581 ± 0.010,0.634 ± 0.024
+trial,Flat LightGBM (no graph),random reveal,3,0.663 ± 0.007,0.657 ± 0.004,0.777 ± 0.019
+trial,"LightGBM, own row only",—,1,0.652,—,0.834
+avito,GraphSAGE,full,3,0.648 ± 0.003,0.515 ± 0.032,0.086 ± 0.003
+avito,GAT,full,3,0.650 ± 0.009,0.522 ± 0.022,0.083 ± 0.001
+avito,Graph Transformer,full,3,0.626 ± 0.003,0.525 ± 0.008,0.072 ± 0.010
+avito,GraphSAGE,random,1,0.633,0.534,0.087
+avito,Flat LightGBM (no graph),random reveal,1,0.649,0.525,0.094
+avito,"LightGBM, own row only",—,1,0.565,—,0.047
+hm,GraphSAGE,full,3,0.700 ± 0.001,0.535 ± 0.002,0.932 ± 0.007
+hm,GAT,full,3,0.701 ± 0.002,0.532 ± 0.002,0.935 ± 0.001
+hm,Graph Transformer,full,3,0.686 ± 0.002,0.509 ± 0.037,0.929 ± 0.003
+hm,GraphSAGE,random,1,0.694,0.534,0.932
+hm,Flat LightGBM (no graph),random reveal,1,0.685,0.561,0.932
+hm,"LightGBM, own row only",—,1,0.591,—,0.895
+amazon,GraphSAGE,full,3,0.701 ± 0.001,0.503 ± 0.008,0.831 ± 0.001
+amazon,GAT,full,3,0.696 ± 0.000,0.510 ± 0.007,0.809 ± 0.004
+amazon,Graph Transformer,full,3,0.684 ± 0.002,0.504 ± 0.014,0.797 ± 0.004
+amazon,GraphSAGE,random,1,0.696,0.517,0.830
+amazon,Flat LightGBM (no graph),random reveal,1,0.672,0.511,0.798
+amazon,"LightGBM, own row only",—,1,0.514,—,0.660

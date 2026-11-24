@@ -1,0 +1,7 @@
+dataset,case-local,coverage,breadth-then-share,learned SAGE,learned MLP,ACO-style k-NN,per-instance SAGE
+event,5,6,0,60,59,253,58
+stack,2,5,1,85,91,315,55
+trial,2,4,1,72,73,360,73
+avito,8,19,8,193,197,402,161
+hm,4,6,0,77,75,287,55
+amazon,2,4,0,42,41,155,35

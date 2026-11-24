@@ -1,0 +1,26 @@
+b,best heuristic,value model,message passing,seeds,gain vs best heuristic (mean ± s.d. over seeds),seeds with CI > 0
+0.25,case-local (ordered),sage,graph,3,0.046 ± 0.001,3/3
+0.25,case-local (ordered),gat,graph,3,0.047 ± 0.000,3/3
+0.25,case-local (ordered),transformer,graph,3,0.047 ± 0.006,3/3
+0.25,case-local (ordered),mlp,no graph,3,0.049 ± 0.004,3/3
+0.25,case-local (ordered),lgbm,no graph,3,0.045 ± 0.000,3/3
+0.5,case-local (ordered),sage,graph,3,-0.012 ± 0.002,0/3
+0.5,case-local (ordered),gat,graph,3,-0.012 ± 0.009,0/3
+0.5,case-local (ordered),transformer,graph,3,-0.012 ± 0.007,0/3
+0.5,case-local (ordered),mlp,no graph,3,-0.013 ± 0.007,0/3
+0.5,case-local (ordered),lgbm,no graph,3,-0.003 ± 0.000,0/3
+1.0,case-local (ordered),sage,graph,3,-0.027 ± 0.008,0/3
+1.0,case-local (ordered),gat,graph,3,-0.028 ± 0.002,0/3
+1.0,case-local (ordered),transformer,graph,3,-0.027 ± 0.005,0/3
+1.0,case-local (ordered),mlp,no graph,3,-0.025 ± 0.002,0/3
+1.0,case-local (ordered),lgbm,no graph,3,-0.020 ± 0.000,0/3
+2.0,breadth-then-share (ordered),sage,graph,3,-0.020 ± 0.005,0/3
+2.0,breadth-then-share (ordered),gat,graph,3,-0.021 ± 0.004,0/3
+2.0,breadth-then-share (ordered),transformer,graph,3,-0.017 ± 0.012,0/3
+2.0,breadth-then-share (ordered),mlp,no graph,3,-0.018 ± 0.001,0/3
+2.0,breadth-then-share (ordered),lgbm,no graph,3,-0.014 ± 0.000,0/3
+4.0,breadth-then-share (ordered),sage,graph,3,-0.003 ± 0.002,0/3
+4.0,breadth-then-share (ordered),gat,graph,3,-0.011 ± 0.012,0/3
+4.0,breadth-then-share (ordered),transformer,graph,3,-0.018 ± 0.014,0/3
+4.0,breadth-then-share (ordered),mlp,no graph,3,-0.009 ± 0.008,0/3
+4.0,breadth-then-share (ordered),lgbm,no graph,3,-0.004 ± 0.000,0/3

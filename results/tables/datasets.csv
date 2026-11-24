@@ -1,0 +1,7 @@
+dataset,task,lists from,lists,entities shared,full cost / prospect,"AUROC, zero lookups","AUROC, full",positive rate
+event,user-ignore,test,100,17%,22.6,0.644,0.697,0.13
+stack,user-engagement,test,100,0%,24.1,0.658,0.897,0.03
+trial,study-outcome,test,100,8%,34.0,0.624,0.637,0.58
+avito,user-clicks,test,100,0%,93.2,0.487,0.662,0.02
+hm,user-churn,test,100,12%,25.1,0.528,0.689,0.83
+amazon,user-churn,test,100,3%,12.7,0.505,0.702,0.60

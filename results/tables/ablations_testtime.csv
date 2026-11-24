@@ -1,0 +1,23 @@
+dataset,change at test time,models,AUROC (all rows),Δ vs unchanged (same batches)
+event,base,6,0.841 ± 0.020,—
+event,rwnontarget,6,0.837 ± 0.023,-0.004 ± 0.003
+event,rwall,6,0.835 ± 0.012,-0.005 ± 0.021
+event,no-event_attendees,6,0.590 ± 0.033,-0.251 ± 0.024
+event,no-user_friends,6,0.866 ± 0.005,0.025 ± 0.018
+event,no-events,6,0.831 ± 0.026,-0.010 ± 0.008
+event,no-event_interest,6,0.833 ± 0.024,-0.008 ± 0.005
+stack,base,1,0.901,—
+stack,rwnontarget,1,0.900,-0.001
+stack,rwall,1,0.832,-0.069
+trial,base,3,0.614 ± 0.012,—
+trial,rwnontarget,3,0.611 ± 0.010,-0.003 ± 0.006
+trial,rwall,3,0.551 ± 0.013,-0.063 ± 0.010
+avito,base,1,0.651,—
+avito,rwnontarget,1,0.626,-0.024
+avito,rwall,1,0.612,-0.039
+hm,base,1,0.700,—
+hm,rwnontarget,1,0.689,-0.010
+hm,rwall,1,0.674,-0.025
+amazon,base,1,0.700,—
+amazon,rwnontarget,1,0.693,-0.007
+amazon,rwall,1,0.623,-0.077

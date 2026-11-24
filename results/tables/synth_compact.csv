@@ -1,0 +1,7 @@
+sharing,label,shared,GNN - graph-free,learned - best h.,SAGE - MLP value,SAGE - blind value,shared - unshared (b=4)
+none,means,0%,+0.007,+0.009*,+0.003,+0.023*,+0.000
+none,pairing,0%,+0.051,+0.012*,-0.001,+0.024*,+0.000
+mid,means,18%,-0.004,+0.016*,-0.001,+0.035*,+0.004
+mid,pairing,18%,+0.068,+0.022*,+0.001,+0.036*,+0.021*
+high,means,49%,+0.001,+0.022*,-0.001,-0.026*,+0.023*
+high,pairing,49%,+0.057,+0.012*,+0.003,+0.017*,+0.029*

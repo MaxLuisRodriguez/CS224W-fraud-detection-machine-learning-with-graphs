@@ -1,0 +1,31 @@
+dataset,metric,b,best heuristic,learned SAGE - best h. [95% CI],bootstrap p,Holm p,significant after Holm,Wilcoxon p
+event,AUROC,0.25,case-local,"-0.123* [-0.144, -0.103]",0.0002,0.0060,yes,0.0000
+event,AUROC,0.5,case-local,"-0.173* [-0.192, -0.155]",0.0002,0.0060,yes,0.0000
+event,AUROC,1.0,coverage,"-0.073* [-0.094, -0.052]",0.0002,0.0060,yes,0.0000
+event,AUROC,2.0,case-local (ordered),"-0.092* [-0.099, -0.084]",0.0002,0.0060,yes,0.0000
+event,AUROC,4.0,case-local,"-0.047* [-0.054, -0.042]",0.0002,0.0060,yes,0.0000
+stack,AUROC,0.25,case-local (ordered),"+0.107* [+0.077, +0.139]",0.0002,0.0060,yes,0.0000
+stack,AUROC,0.5,case-local (ordered),"+0.085* [+0.059, +0.112]",0.0002,0.0060,yes,0.0000
+stack,AUROC,1.0,case-local (ordered),"+0.001 [-0.021, +0.025]",0.9519,1.0000,no,0.8382
+stack,AUROC,2.0,case-local,"-0.006 [-0.020, +0.006]",0.3064,1.0000,no,0.6470
+stack,AUROC,4.0,case-local,"-0.003 [-0.007, +0.000]",0.0908,1.0000,no,0.8091
+trial,AUROC,0.25,case-local,"-0.008* [-0.012, -0.004]",0.0002,0.0060,yes,0.0016
+trial,AUROC,0.5,uncertainty-first,"-0.014* [-0.018, -0.009]",0.0002,0.0060,yes,0.0000
+trial,AUROC,1.0,coverage,"-0.015* [-0.020, -0.009]",0.0002,0.0060,yes,0.0000
+trial,AUROC,2.0,coverage,"-0.004 [-0.009, +0.001]",0.0924,1.0000,no,0.2315
+trial,AUROC,4.0,coverage,"+0.003 [-0.001, +0.007]",0.1846,1.0000,no,0.1131
+avito,AUROC,0.25,case-local (ordered),"+0.011 [-0.032, +0.055]",0.6399,1.0000,no,0.9043
+avito,AUROC,0.5,case-local (ordered),"-0.013 [-0.059, +0.035]",0.5815,1.0000,no,0.5500
+avito,AUROC,1.0,case-local (ordered),"-0.033 [-0.073, +0.005]",0.0844,1.0000,no,0.6078
+avito,AUROC,2.0,breadth-then-share,"-0.004 [-0.019, +0.011]",0.5803,1.0000,no,0.0036
+avito,AUROC,4.0,case-local,"+0.007 [-0.000, +0.016]",0.0534,0.8543,no,0.9703
+hm,AUROC,0.25,uncertainty-first,"+0.086* [+0.070, +0.103]",0.0002,0.0060,yes,0.0000
+hm,AUROC,0.5,case-local,"+0.093* [+0.075, +0.111]",0.0002,0.0060,yes,0.0000
+hm,AUROC,1.0,case-local,"-0.000 [-0.001, +0.000]",0.6677,1.0000,no,0.0340
+hm,AUROC,2.0,breadth-then-share,"+0.000 [-0.001, +0.002]",0.6035,1.0000,no,0.7614
+hm,AUROC,4.0,case-local,"+0.001 [-0.001, +0.002]",0.4822,1.0000,no,0.4873
+amazon,AUROC,0.25,case-local,"+0.062* [+0.052, +0.071]",0.0002,0.0060,yes,0.0000
+amazon,AUROC,0.5,case-local,"+0.031* [+0.021, +0.041]",0.0002,0.0060,yes,0.0000
+amazon,AUROC,1.0,case-local,"+0.000 [+0.000, +0.001]",0.0972,1.0000,no,n/a
+amazon,AUROC,2.0,case-local,"-0.001 [-0.002, +0.001]",0.4668,1.0000,no,0.4682
+amazon,AUROC,4.0,case-local,"+0.001 [-0.001, +0.002]",0.2646,1.0000,no,0.1827

@@ -1,0 +1,21 @@
+policy,table,b=0.25,b=0.5,b=1,b=2,b=4
+case-local,event_attendees,28,51,93,93,93
+case-local,event_interest,0,1,3,11,11
+case-local,events,0,0,0,7,25
+case-local,user_friends,4,11,33,113,128
+case-local,users,0,0,0,32,256
+coverage,event_attendees,14,14,17,29,71
+coverage,event_interest,1,1,2,3,8
+coverage,events,3,31,83,165,261
+coverage,user_friends,14,14,17,32,90
+coverage,users,0,4,10,26,82
+breadth-then-share,event_attendees,28,51,93,93,93
+breadth-then-share,event_interest,0,1,3,3,6
+breadth-then-share,events,0,0,0,125,304
+breadth-then-share,user_friends,4,11,33,33,69
+breadth-then-share,users,0,0,0,3,40
+learned value: SAGE,event_attendees,31,48,67,75,81
+learned value: SAGE,event_interest,1,3,6,9,11
+learned value: SAGE,events,0,0,9,101,285
+learned value: SAGE,user_friends,0,13,46,68,101
+learned value: SAGE,users,0,0,0,4,35

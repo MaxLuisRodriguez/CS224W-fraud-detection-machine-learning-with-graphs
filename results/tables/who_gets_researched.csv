@@ -1,0 +1,6 @@
+policy,uncertainty p(1-p): researched vs not,rank distance to top-13 cutoff: researched vs not,share of prospects researched
+case-local,0.048 vs 0.046,51.5 vs 52.6,0.25
+coverage,0.066 vs 0.044,30.9 vs 55.1,0.11
+breadth-then-share,0.048 vs 0.046,51.5 vs 52.6,0.25
+learned value: SAGE,0.068 vs 0.040,27.5 vs 60.5,0.25
+learned value: MLP,0.067 vs 0.040,27.7 vs 60.5,0.25

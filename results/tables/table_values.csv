@@ -1,0 +1,25 @@
+dataset,table pulled for every prospect,lookups,AUROC gain (pull),gain (pull + enrich)
+event,event_attendees,89,"+0.153 [+0.123, +0.180]",+0.152
+event,event_interest,11,"-0.016 [-0.034, +0.002]",-0.018
+event,events,7,"-0.008 [-0.024, +0.007]",-0.014
+event,user_friends,128,"+0.034 [+0.010, +0.057]",-0.054
+stack,badges,116,"+0.204 [+0.139, +0.268]",+0.204
+stack,comments,78,"+0.198 [+0.131, +0.272]",+0.192
+stack,postHistory,121,"+0.208 [+0.149, +0.273]",+0.214
+stack,posts,121,"+0.212 [+0.151, +0.279]",+0.216
+stack,votes,3,"+0.042 [+0.005, +0.090]",+0.044
+trial,conditions_studies,114,"-0.004 [-0.011, +0.003]",-0.004
+trial,designs,128,"+0.020 [+0.011, +0.030]",+0.020
+trial,drop_withdrawals,0,"+0.000 [+0.000, +0.000]",+0.000
+trial,eligibilities,128,"+0.020 [+0.013, +0.026]",+0.020
+trial,facilities_studies,126,"+0.005 [-0.000, +0.011]",+0.005
+trial,interventions_studies,59,"+0.002 [-0.006, +0.009]",+0.001
+trial,outcome_analyses,0,"+0.000 [+0.000, +0.000]",+0.000
+trial,outcomes,0,"+0.000 [+0.000, +0.000]",+0.000
+trial,reported_event_totals,0,"+0.000 [+0.000, +0.000]",+0.000
+trial,sponsors_studies,128,"-0.001 [-0.007, +0.006]",-0.002
+avito,PhoneRequestsStream,62,"-0.011 [-0.074, +0.054]",-0.009
+avito,SearchInfo,93,"+0.218 [+0.145, +0.299]",+0.251
+avito,VisitStream,103,"+0.164 [+0.092, +0.238]",+0.196
+hm,transactions,128,"+0.174 [+0.156, +0.194]",+0.184
+amazon,review,128,"+0.183 [+0.157, +0.208]",+0.184
